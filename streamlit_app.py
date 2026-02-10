@@ -88,7 +88,7 @@ with col1:
     st.markdown("""
     <div class="feature-box">
         <h3>📊 Real-Time Market Data</h3>
-        <p>Live prices for BTC, SOL, ETH updating every 30 seconds</p>
+        <p>Live prices for BTC, ETH, SOL updating every 30 seconds</p>
     </div>
     """, unsafe_allow_html=True)
 

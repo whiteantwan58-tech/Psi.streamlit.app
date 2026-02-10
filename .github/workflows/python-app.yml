@@ -36,7 +36,7 @@ jobs:
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics --exclude=.git,__pycache__,.venv
     - name: Test app imports
       run: |
-        python -c "import streamlit; import plotly; import pandas; import numpy; import requests"
+        python -c "import streamlit; import plotly; import pandas; import numpy; import requests; import altair"
         echo "All dependencies imported successfully"
     - name: Verify app structure
       run: |

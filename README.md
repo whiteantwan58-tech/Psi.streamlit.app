@@ -6,7 +6,7 @@ Professional real-time cryptocurrency analytics dashboard powered by Streamlit.
 
 ## ✨ Features
 
-- 📊 **Real-Time Market Data** - Live BTC, SOL, ETH prices updating every 30 seconds
+- 📊 **Real-Time Market Data** - Live BTC, ETH, SOL prices updating every 30 seconds
 - 📈 **Advanced Charts** - Interactive Plotly visualizations with zoom and pan
 - 🤖 **AI-Powered Insights** - Statistical ML analysis with RSI, MACD, and Bollinger Bands
 - 💼 **Portfolio Tracking** - Monitor your crypto holdings and performance
