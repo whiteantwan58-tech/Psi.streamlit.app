@@ -4,6 +4,14 @@ Professional real-time cryptocurrency analytics dashboard powered by Streamlit.
 
 [![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://share.streamlit.io)
 
+## 🔓 Zero Configuration Required
+
+**Just install and run** - No API keys, no setup, no configuration files needed!
+
+The dashboard uses 100% **FREE public APIs** that require no authentication:
+- ✅ CoinGecko API (no key required)
+- ✅ CoinCap API (no key required)
+
 ## ✨ Features
 
 - 📊 **Real-Time Market Data** - Live BTC, ETH, SOL prices updating every 30 seconds
@@ -27,7 +35,7 @@ cd Psi.streamlit.app
 # Install dependencies
 pip install -r requirements.txt
 
-# Run the app
+# Run the app - NO CONFIGURATION NEEDED!
 streamlit run streamlit_app.py
 ```
 
@@ -92,13 +100,30 @@ Welcome page with feature overview and navigation guide.
 - **Endpoint**: `https://api.coingecko.com/api/v3/simple/price`
 - **Features**: Real-time prices, market caps, 24h volumes, price changes
 - **Rate Limit**: 50 calls/minute (sufficient for this app)
-- **No API Key Required**: ✅
+- **Authentication**: None ✅
+- **API Key Required**: ❌ NO
 
 ### CoinCap API (Backup)
 - **Endpoint**: `https://api.coincap.io/v2/assets`
 - **Features**: Real-time prices, historical data
 - **Rate Limit**: Unlimited for basic usage
-- **No API Key Required**: ✅
+- **Authentication**: None ✅
+- **API Key Required**: ❌ NO
+
+### 🔓 API Configuration
+
+**The app requires ZERO configuration!** It works immediately after installation.
+
+- ✅ No API keys needed
+- ✅ No signup required
+- ✅ No rate limit concerns (smart caching built-in)
+- ✅ No authentication tokens
+- ✅ 100% free forever
+
+**Want to add more APIs?** See [API_SETUP.md](API_SETUP.md) for instructions on:
+- Adding additional free cryptocurrency APIs
+- Optional premium API configuration (for future use)
+- API troubleshooting and best practices
 
 ## 🛠️ Technical Stack
 

@@ -189,6 +189,25 @@ with st.sidebar:
     st.markdown("### ⏰ Status")
     st.info(f"Last loaded: {time.strftime('%H:%M:%S', time.localtime(st.session_state.last_update))}")
     
+    # API Status Indicator
+    st.markdown("---")
+    st.markdown("### 🔓 API Configuration")
+    st.success("✅ **No API Keys Required!**")
+    st.caption("Using 100% free APIs")
+    
+    with st.expander("📡 Data Sources"):
+        st.markdown("""
+        **Primary**: CoinGecko API
+        - Free tier: 50 calls/min
+        - No authentication needed
+        
+        **Backup**: CoinCap API  
+        - Free tier: Unlimited
+        - No authentication needed
+        
+        💡 *All features work without any configuration!*
+        """)
+    
     st.markdown("---")
     st.markdown("### 🎨 About")
     st.markdown("""

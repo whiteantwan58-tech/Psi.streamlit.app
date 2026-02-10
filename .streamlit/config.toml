@@ -1,0 +1,19 @@
+# Streamlit Configuration for Psi Crypto Dashboard
+
+# This file is OPTIONAL - The app works perfectly without it!
+# The dashboard uses 100% free APIs that require no authentication.
+
+[theme]
+# Optional: Customize the theme
+# primaryColor = "#00f5ff"
+# backgroundColor = "#0a0e27"
+# secondaryBackgroundColor = "#1a1f3a"
+# textColor = "#ffffff"
+
+[server]
+# Optional: Server settings
+# port = 8501
+# headless = true
+
+# Note: API keys are NOT required for this dashboard
+# All features work with free public APIs (CoinGecko, CoinCap)
