@@ -3,6 +3,7 @@ import pandas as pd
 import requests
 import time
 import os
+import glob
 from datetime import datetime
 from solana.rpc.api import Client
 
@@ -75,7 +76,6 @@ def load_csv_files():
     """Load CSV files from the repository root"""
     csv_files = []
     try:
-        import glob
         csv_paths = glob.glob("*.csv")
         for csv_path in csv_paths:
             try:
