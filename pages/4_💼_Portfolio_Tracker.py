@@ -110,7 +110,7 @@ with col3:
     purchase_price = st.number_input(
         "Purchase Price ($)",
         min_value=0.0,
-        value=current_prices[selected_coin],
+        value=float(current_prices[selected_coin]),
         step=0.01,
         format="%.2f"
     )
