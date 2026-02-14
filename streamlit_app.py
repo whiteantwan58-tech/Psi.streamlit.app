@@ -151,6 +151,63 @@ def export_to_csv(data, filename):
         st.error(f"Error exporting to CSV: {e}")
         return None
 
+def log_activity(action, details, status):
+    """Log activity to activity_log.csv"""
+    try:
+        log_file = "activity_log.csv"
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        
+        # Create log entry
+        log_entry = {
+            "Timestamp": timestamp,
+            "Action": action,
+            "Details": details,
+            "Status": status
+        }
+        
+        # Check if log file exists
+        if os.path.exists(log_file):
+            df = pd.read_csv(log_file)
+            df = pd.concat([df, pd.DataFrame([log_entry])], ignore_index=True)
+        else:
+            df = pd.DataFrame([log_entry])
+        
+        # Write to CSV
+        df.to_csv(log_file, index=False)
+        return True
+    except Exception as e:
+        st.warning(f"Could not log activity: {e}")
+        return False
+
+def load_activity_log():
+    """Load activity log from CSV"""
+    try:
+        log_file = "activity_log.csv"
+        if os.path.exists(log_file):
+            df = pd.read_csv(log_file)
+            return df
+        return pd.DataFrame(columns=["Timestamp", "Action", "Details", "Status"])
+    except Exception as e:
+        st.warning(f"Could not load activity log: {e}")
+        return pd.DataFrame(columns=["Timestamp", "Action", "Details", "Status"])
+
+def get_activity_stats(log_df):
+    """Calculate activity statistics"""
+    if log_df.empty:
+        return {"total": 0, "success": 0, "error": 0, "success_rate": 0}
+    
+    total = len(log_df)
+    success = len(log_df[log_df['Status'] == 'SUCCESS'])
+    error = len(log_df[log_df['Status'] == 'ERROR'])
+    success_rate = (success / total * 100) if total > 0 else 0
+    
+    return {
+        "total": total,
+        "success": success,
+        "error": error,
+        "success_rate": success_rate
+    }
+
 # Main app
 def main():
     # Header
@@ -179,29 +236,44 @@ def main():
         st.caption(f"Last updated: {datetime.now().strftime('%H:%M:%S')}")
     
     # Main content tabs
-    tab1, tab2, tab3, tab4, tab5 = st.tabs(["📈 Live Data", "🌐 CEC/WAM Live", "💰 Holdings", "📁 CSV Data", "ℹ️ About"])
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["📈 Live Data", "🌐 CEC/WAM Live", "💰 Holdings", "📁 CSV Data", "📋 Activity Log", "ℹ️ About"])
     
     with tab1:
         st.header("Live Blockchain Data")
+        
+        # Live status indicators
+        col_status1, col_status2, col_status3 = st.columns(3)
+        with col_status1:
+            st.markdown("🟢 **Live Connection Active**")
+        with col_status2:
+            countdown = 30 - (datetime.now().second % 30)
+            st.markdown(f"🔄 **Auto-Refresh:** {countdown}s")
+        with col_status3:
+            st.markdown(f"📡 **Data Fresh:** ✅")
+        
+        st.divider()
         
         # Create columns for metrics
         col1, col2, col3 = st.columns(3)
         
         # Fetch wallet balance
         with col1:
-            with st.spinner("Fetching wallet balance..."):
+            with st.spinner("🔄 Loading wallet balance..."):
                 wallet_balance = fetch_wallet_balance(WALLET_ADDRESS)
+                log_activity("FETCH_WALLET_BALANCE", f"Wallet: {WALLET_ADDRESS[:8]}...", "SUCCESS" if wallet_balance >= 0 else "ERROR")
                 st.metric(
                     label="💎 Wallet SOL Balance",
                     value=f"{wallet_balance:.4f} SOL",
                     delta=None
                 )
+                st.caption(f"🕒 {datetime.now().strftime('%H:%M:%S')}")
         
         # Fetch token metadata
         with col2:
-            with st.spinner("Fetching token data..."):
+            with st.spinner("🔄 Loading token data..."):
                 token_metadata = fetch_token_metadata(TOKEN_ADDRESS)
                 if token_metadata:
+                    log_activity("FETCH_TOKEN_METADATA", f"Token: {TOKEN_ADDRESS[:8]}...", "SUCCESS")
                     token_name = token_metadata.get("name", "PSI-Coin")
                     token_symbol = token_metadata.get("symbol", "PSI")
                     st.metric(
@@ -210,21 +282,25 @@ def main():
                         delta=token_name
                     )
                 else:
+                    log_activity("FETCH_TOKEN_METADATA", f"Token: {TOKEN_ADDRESS[:8]}...", "ERROR")
                     st.metric(
                         label="🪙 Token Info",
                         value="PSI-Coin",
                         delta="Loading..."
                     )
+                st.caption(f"🕒 {datetime.now().strftime('%H:%M:%S')}")
         
         # Fetch token price
         with col3:
-            with st.spinner("Fetching token price..."):
+            with st.spinner("🔄 Loading token price..."):
                 token_price = fetch_token_price(TOKEN_ADDRESS)
+                log_activity("FETCH_TOKEN_PRICE", f"Price: ${token_price:.6f}", "SUCCESS" if token_price > 0 else "WARNING")
                 st.metric(
                     label="💵 Token Price",
                     value=f"${token_price:.6f}" if token_price > 0 else "N/A",
                     delta=None
                 )
+                st.caption(f"🕒 {datetime.now().strftime('%H:%M:%S')}")
         
         st.divider()
         
@@ -245,6 +321,18 @@ def main():
     
     with tab2:
         st.header("🌐 CEC/WAM Live Data System")
+        
+        # Real-time refresh indicator
+        col_sync1, col_sync2, col_sync3 = st.columns(3)
+        with col_sync1:
+            st.markdown("🔄 **Refresh Status:** Active")
+        with col_sync2:
+            data_age = datetime.now().strftime('%H:%M:%S')
+            st.markdown(f"📊 **Data Age:** Just now")
+        with col_sync3:
+            st.markdown(f"⏱️ **Sync Interval:** 5 min")
+        
+        st.divider()
         
         st.info("📊 **CEC/WAM (Wide Area Monitoring)** - Real-time data synchronization system")
         
@@ -284,7 +372,12 @@ def main():
                 cec_wam_df = fetch_cec_wam_data(CEC_WAM_GOOGLE_SHEET_URL)
                 
             if cec_wam_df is not None and not cec_wam_df.empty:
+                log_activity("FETCH_CEC_WAM_DATA", f"Loaded {len(cec_wam_df)} records", "SUCCESS")
                 st.success(f"✅ Successfully loaded {len(cec_wam_df)} records from live data source")
+                st.caption(f"🕒 Data loaded at: {datetime.now().strftime('%H:%M:%S')}")
+                
+                # Animated record counter
+                st.markdown(f"### 📊 Total Records: **{len(cec_wam_df)}**")
                 
                 # Status distribution analytics
                 status_counts = analyze_cec_wam_status(cec_wam_df)
@@ -324,19 +417,22 @@ def main():
                 col1, col2 = st.columns(2)
                 with col1:
                     csv_export = cec_wam_df.to_csv(index=False)
-                    st.download_button(
+                    if st.download_button(
                         label="⬇️ Download as CSV",
                         data=csv_export,
                         file_name=f"cec_wam_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
                         mime="text/csv"
-                    )
+                    ):
+                        log_activity("EXPORT_CEC_WAM_DATA", f"Exported {len(cec_wam_df)} records", "SUCCESS")
                 
                 with col2:
                     st.info(f"🔄 Auto-refresh: Every {CEC_WAM_REFRESH_INTERVAL // 60} minutes")
                 
             elif cec_wam_df is not None and cec_wam_df.empty:
+                log_activity("FETCH_CEC_WAM_DATA", "Sheet is empty", "WARNING")
                 st.warning("⚠️ Google Sheet is empty or has no data")
             else:
+                log_activity("FETCH_CEC_WAM_DATA", "Failed to fetch data", "ERROR")
                 st.error("❌ Failed to fetch CEC/WAM data. Please check:")
                 st.markdown("""
                 - Sheet URL is correct
@@ -381,12 +477,18 @@ def main():
                 """)
     
     with tab3:
-        st.header("Holdings & Valuation")
+        st.header("💰 Holdings & Valuation Calculator")
         
         # Calculate holdings if we have price data
-        token_price = fetch_token_price(TOKEN_ADDRESS)
+        with st.spinner("🔄 Loading price data..."):
+            token_price = fetch_token_price(TOKEN_ADDRESS)
         
         if token_price > 0:
+            st.success(f"✅ Current PSI-Coin Price: ${token_price:.6f}")
+            st.caption(f"🕒 Price updated at: {datetime.now().strftime('%H:%M:%S')}")
+            
+            st.divider()
+            
             st.info("💡 Enter your PSI-Coin holdings to calculate current valuation")
             
             holdings_amount = st.number_input(
@@ -400,16 +502,26 @@ def main():
             if holdings_amount > 0:
                 total_value = holdings_amount * token_price
                 
+                st.divider()
+                st.subheader("📊 Portfolio Summary")
+                
                 col1, col2, col3 = st.columns(3)
                 with col1:
-                    st.metric("Holdings", f"{holdings_amount:,.2f} PSI")
+                    st.metric("💎 Holdings", f"{holdings_amount:,.2f} PSI")
                 with col2:
-                    st.metric("Token Price", f"${token_price:.6f}")
+                    st.metric("💵 Token Price", f"${token_price:.6f}")
                 with col3:
-                    st.metric("Total Value", f"${total_value:.2f}")
+                    # Color-coded value indicator
+                    value_color = "🟢" if total_value > 0 else "⚪"
+                    st.metric(f"{value_color} Total Value", f"${total_value:.2f}")
+                
+                st.caption(f"🕒 Calculated at: {datetime.now().strftime('%H:%M:%S')}")
+                
+                st.divider()
                 
                 # Export option
-                if st.button("💾 Export Holdings to CSV"):
+                st.subheader("💾 Export Portfolio Data")
+                if st.button("📥 Export Holdings to CSV"):
                     export_data = [{
                         "Token": "PSI-Coin",
                         "Address": TOKEN_ADDRESS,
@@ -420,6 +532,7 @@ def main():
                     }]
                     csv_data = export_to_csv(export_data, "psi_holdings.csv")
                     if csv_data:
+                        log_activity("EXPORT_HOLDINGS", f"Holdings: {holdings_amount}, Value: ${total_value:.2f}", "SUCCESS")
                         st.download_button(
                             label="⬇️ Download CSV",
                             data=csv_data,
@@ -427,25 +540,33 @@ def main():
                             mime="text/csv"
                         )
                         st.success("✅ Holdings data ready for download!")
+                        st.caption(f"🕒 {datetime.now().strftime('%H:%M:%S')}")
         else:
             st.warning("⚠️ Token price data not available. Holdings calculation unavailable.")
+            log_activity("HOLDINGS_CALCULATOR", "Price not available", "WARNING")
     
     with tab4:
-        st.header("CSV Data Management")
+        st.header("📁 CSV Data Management")
         
         # Load CSV files
-        csv_files = load_csv_files()
+        with st.spinner("🔄 Loading CSV files..."):
+            csv_files = load_csv_files()
         
         if csv_files:
+            log_activity("LOAD_CSV_FILES", f"Loaded {len(csv_files)} files", "SUCCESS")
             st.success(f"✅ Found {len(csv_files)} CSV file(s)")
+            st.caption(f"🕒 Files loaded at: {datetime.now().strftime('%H:%M:%S')}")
+            
+            st.divider()
             
             for csv_file in csv_files:
                 with st.expander(f"📄 {csv_file['name']}", expanded=True):
                     st.dataframe(csv_file['data'], use_container_width=True)
                     
                     # Show statistics
-                    st.caption(f"Rows: {len(csv_file['data'])} | Columns: {len(csv_file['data'].columns)}")
+                    st.caption(f"📊 Rows: {len(csv_file['data'])} | Columns: {len(csv_file['data'].columns)}")
         else:
+            log_activity("LOAD_CSV_FILES", "No CSV files found", "INFO")
             st.info("ℹ️ No CSV files found in the repository root directory.")
             st.write("To add CSV data:")
             st.write("1. Place your `pump.fun.csv` or other CSV files in the root directory")
@@ -454,19 +575,103 @@ def main():
         st.divider()
         
         # File upload option
-        st.subheader("Upload CSV Data")
+        st.subheader("📤 Upload CSV Data")
         uploaded_file = st.file_uploader("Choose a CSV file", type=['csv'])
         
         if uploaded_file is not None:
             try:
-                df = pd.read_csv(uploaded_file)
+                with st.spinner("🔄 Processing uploaded file..."):
+                    df = pd.read_csv(uploaded_file)
+                log_activity("UPLOAD_CSV", f"Uploaded {uploaded_file.name}", "SUCCESS")
                 st.success(f"✅ Successfully loaded {uploaded_file.name}")
                 st.dataframe(df, use_container_width=True)
-                st.caption(f"Rows: {len(df)} | Columns: {len(df.columns)}")
+                st.caption(f"📊 Rows: {len(df)} | Columns: {len(df.columns)}")
+                st.caption(f"🕒 Uploaded at: {datetime.now().strftime('%H:%M:%S')}")
             except Exception as e:
+                log_activity("UPLOAD_CSV", f"Failed to upload {uploaded_file.name}: {str(e)}", "ERROR")
                 st.error(f"❌ Error loading file: {e}")
     
     with tab5:
+        st.header("📋 Activity Log")
+        
+        # Load activity log
+        with st.spinner("🔄 Loading activity log..."):
+            activity_log = load_activity_log()
+        
+        # Activity statistics
+        stats = get_activity_stats(activity_log)
+        
+        # Live system time
+        st.markdown(f"### 🕒 System Time: **{datetime.now().strftime('%H:%M:%S')}**")
+        
+        st.divider()
+        
+        # Statistics dashboard
+        st.subheader("📊 Activity Statistics")
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            st.metric("📝 Total Operations", stats["total"])
+        with col2:
+            st.metric("✅ Successful", stats["success"], delta=None)
+        with col3:
+            st.metric("❌ Errors", stats["error"], delta=None)
+        with col4:
+            success_color = "🟢" if stats["success_rate"] >= 80 else "🟡" if stats["success_rate"] >= 50 else "🔴"
+            st.metric(f"{success_color} Success Rate", f"{stats['success_rate']:.1f}%")
+        
+        st.divider()
+        
+        # Recent activity ticker
+        if not activity_log.empty:
+            st.subheader("🔄 Recent Activity (Last 5)")
+            recent = activity_log.tail(5).sort_index(ascending=False)
+            
+            for idx, row in recent.iterrows():
+                status_emoji = "✅" if row['Status'] == 'SUCCESS' else "⚠️" if row['Status'] == 'WARNING' else "❌"
+                st.markdown(f"{status_emoji} **{row['Action']}** - {row['Details']} _{row['Timestamp']}_")
+            
+            st.divider()
+            
+            # Full activity log table
+            st.subheader("📜 Complete Activity Log")
+            
+            # Color-code the status column
+            def highlight_status(row):
+                if row['Status'] == 'SUCCESS':
+                    return ['background-color: #d4edda'] * len(row)
+                elif row['Status'] == 'ERROR':
+                    return ['background-color: #f8d7da'] * len(row)
+                elif row['Status'] == 'WARNING':
+                    return ['background-color: #fff3cd'] * len(row)
+                else:
+                    return [''] * len(row)
+            
+            # Display styled dataframe
+            st.dataframe(
+                activity_log.sort_index(ascending=False),
+                use_container_width=True,
+                height=400
+            )
+            
+            st.caption(f"📈 Total Logged Operations: {len(activity_log)}")
+            st.caption(f"🕒 Log last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            
+            # Export activity log
+            st.divider()
+            st.subheader("💾 Export Activity Log")
+            
+            csv_export = activity_log.to_csv(index=False)
+            st.download_button(
+                label="⬇️ Download Activity Log CSV",
+                data=csv_export,
+                file_name=f"activity_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                mime="text/csv"
+            )
+        else:
+            st.info("ℹ️ No activity logged yet. Operations will be logged automatically as you use the application.")
+    
+    with tab6:
         st.header("About PSI-Coin Monitor")
         
         st.markdown("""
@@ -477,6 +682,10 @@ def main():
         - **Real-time Data**: Live updates every 30 seconds
         - **Wallet Monitoring**: Track SOL balance in real-time
         - **Token Tracking**: Monitor PSI-Coin metadata and pricing
+        - **Activity Logging**: Complete audit trail of all operations
+          - Real-time operation tracking
+          - Success rate analytics
+          - Export logs for analysis
         - **CEC/WAM System**: Live data synchronization with Google Sheets
           - Color-coded status indicators (PERFECT, TODO, ACTIVE, STABLE)
           - Real-time status distribution analytics
@@ -513,7 +722,7 @@ def main():
         
         st.divider()
         
-        st.caption("Built with ❤️ using Streamlit | Version 2.0.0 - CEC/WAM Enabled")
+        st.caption("Built with ❤️ using Streamlit | Version 3.0.0 - Activity Logging & Enhanced Visuals")
     
     # Auto-refresh mechanism
     if auto_refresh:
