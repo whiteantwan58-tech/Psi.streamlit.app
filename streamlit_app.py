@@ -21,6 +21,16 @@ WALLET_ADDRESS = "b59HHkFpg3g9yBwwLcuDH6z1d6d6z3vdGWX7mkX3txH"
 SOLANA_RPC = "https://api.mainnet-beta.solana.com"
 SOLSCAN_API_BASE = "https://public-api.solscan.io"
 
+# CEC/WAM System Constants
+CEC_WAM_GOOGLE_SHEET_URL = os.getenv("CEC_WAM_SHEET_URL", "")
+CEC_WAM_REFRESH_INTERVAL = 300  # 5 minutes in seconds
+CEC_WAM_STATUS_COLORS = {
+    "PERFECT": "🟢",
+    "TODO": "🟡",
+    "ACTIVE": "🔵",
+    "STABLE": "⚪"
+}
+
 # Environment variables - SECURE: No hardcoded keys
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 if GROQ_API_KEY:
@@ -71,6 +81,50 @@ def fetch_token_price(token_address):
     except Exception as e:
         st.warning(f"Could not fetch token price: {e}")
         return 0.0
+
+@st.cache_data(ttl=CEC_WAM_REFRESH_INTERVAL)
+def fetch_cec_wam_data(sheet_url):
+    """Fetch live data from Google Sheets CSV export for CEC/WAM system"""
+    try:
+        if not sheet_url:
+            return None
+        
+        # Convert Google Sheets URL to CSV export URL
+        if "/edit" in sheet_url:
+            csv_url = sheet_url.replace("/edit", "/export?format=csv")
+        elif "docs.google.com/spreadsheets/d/" in sheet_url:
+            # Extract sheet ID and create CSV export URL
+            sheet_id = sheet_url.split("/d/")[1].split("/")[0]
+            csv_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv"
+        else:
+            csv_url = sheet_url
+        
+        response = requests.get(csv_url, timeout=15)
+        if response.status_code == 200:
+            from io import StringIO
+            df = pd.read_csv(StringIO(response.text))
+            return df
+        return None
+    except Exception as e:
+        st.error(f"Error fetching CEC/WAM data: {e}")
+        return None
+
+def analyze_cec_wam_status(df):
+    """Analyze status distribution in CEC/WAM data"""
+    if df is None or 'Status' not in df.columns:
+        return {}
+    
+    status_counts = {}
+    for status in ["PERFECT", "TODO", "ACTIVE", "STABLE"]:
+        count = len(df[df['Status'].str.upper() == status]) if 'Status' in df.columns else 0
+        status_counts[status] = count
+    
+    return status_counts
+
+def get_status_indicator(status):
+    """Get color indicator for status"""
+    status_upper = str(status).upper()
+    return CEC_WAM_STATUS_COLORS.get(status_upper, "⚫")
 
 def load_csv_files():
     """Load CSV files from the repository root"""
@@ -125,7 +179,7 @@ def main():
         st.caption(f"Last updated: {datetime.now().strftime('%H:%M:%S')}")
     
     # Main content tabs
-    tab1, tab2, tab3, tab4 = st.tabs(["📈 Live Data", "💰 Holdings", "📁 CSV Data", "ℹ️ About"])
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(["📈 Live Data", "🌐 CEC/WAM Live", "💰 Holdings", "📁 CSV Data", "ℹ️ About"])
     
     with tab1:
         st.header("Live Blockchain Data")
@@ -190,6 +244,143 @@ def main():
                 st.write("**Status:**", "✅ Active")
     
     with tab2:
+        st.header("🌐 CEC/WAM Live Data System")
+        
+        st.info("📊 **CEC/WAM (Wide Area Monitoring)** - Real-time data synchronization system")
+        
+        # Configuration section
+        with st.expander("⚙️ CEC/WAM Configuration", expanded=True):
+            st.write("**Google Sheets URL Configuration:**")
+            
+            # Check if URL is configured
+            if CEC_WAM_GOOGLE_SHEET_URL:
+                st.success(f"✅ Sheet URL configured")
+                st.code(CEC_WAM_GOOGLE_SHEET_URL[:50] + "..." if len(CEC_WAM_GOOGLE_SHEET_URL) > 50 else CEC_WAM_GOOGLE_SHEET_URL)
+            else:
+                st.warning("⚠️ No Google Sheets URL configured")
+                st.write("To enable CEC/WAM live data:")
+                st.markdown("""
+                1. Set the `CEC_WAM_SHEET_URL` environment variable
+                2. Use a Google Sheets URL (must be publicly accessible)
+                3. Example: `https://docs.google.com/spreadsheets/d/YOUR_SHEET_ID/edit`
+                """)
+            
+            st.write("**Status Color Codes:**")
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.write(f"{CEC_WAM_STATUS_COLORS['PERFECT']} PERFECT")
+            with col2:
+                st.write(f"{CEC_WAM_STATUS_COLORS['TODO']} TODO")
+            with col3:
+                st.write(f"{CEC_WAM_STATUS_COLORS['ACTIVE']} ACTIVE")
+            with col4:
+                st.write(f"{CEC_WAM_STATUS_COLORS['STABLE']} STABLE")
+        
+        st.divider()
+        
+        # Fetch and display CEC/WAM data
+        if CEC_WAM_GOOGLE_SHEET_URL:
+            with st.spinner("🔄 Fetching live CEC/WAM data from Google Sheets..."):
+                cec_wam_df = fetch_cec_wam_data(CEC_WAM_GOOGLE_SHEET_URL)
+                
+            if cec_wam_df is not None and not cec_wam_df.empty:
+                st.success(f"✅ Successfully loaded {len(cec_wam_df)} records from live data source")
+                
+                # Status distribution analytics
+                status_counts = analyze_cec_wam_status(cec_wam_df)
+                
+                if status_counts:
+                    st.subheader("📊 Status Distribution")
+                    cols = st.columns(4)
+                    for idx, (status, count) in enumerate(status_counts.items()):
+                        with cols[idx]:
+                            st.metric(
+                                label=f"{CEC_WAM_STATUS_COLORS[status]} {status}",
+                                value=count
+                            )
+                
+                st.divider()
+                
+                # Display the data with status indicators
+                st.subheader("📋 Live CEC/WAM Data Table")
+                
+                # Add status indicators to dataframe display
+                if 'Status' in cec_wam_df.columns:
+                    display_df = cec_wam_df.copy()
+                    display_df['Status'] = display_df['Status'].apply(
+                        lambda x: f"{get_status_indicator(x)} {x}"
+                    )
+                    st.dataframe(display_df, use_container_width=True, height=400)
+                else:
+                    st.dataframe(cec_wam_df, use_container_width=True, height=400)
+                
+                # Data statistics
+                st.caption(f"📈 Total Records: {len(cec_wam_df)} | Columns: {len(cec_wam_df.columns)} | Last Updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+                
+                # Export option
+                st.divider()
+                st.subheader("💾 Export CEC/WAM Data")
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    csv_export = cec_wam_df.to_csv(index=False)
+                    st.download_button(
+                        label="⬇️ Download as CSV",
+                        data=csv_export,
+                        file_name=f"cec_wam_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                        mime="text/csv"
+                    )
+                
+                with col2:
+                    st.info(f"🔄 Auto-refresh: Every {CEC_WAM_REFRESH_INTERVAL // 60} minutes")
+                
+            elif cec_wam_df is not None and cec_wam_df.empty:
+                st.warning("⚠️ Google Sheet is empty or has no data")
+            else:
+                st.error("❌ Failed to fetch CEC/WAM data. Please check:")
+                st.markdown("""
+                - Sheet URL is correct
+                - Sheet is publicly accessible (Share → Anyone with link can view)
+                - Sheet contains valid CSV data
+                """)
+        else:
+            st.info("ℹ️ CEC/WAM live data system is not configured. Set `CEC_WAM_SHEET_URL` to enable.")
+            
+            # Demo/Example section
+            with st.expander("📖 Learn More About CEC/WAM System"):
+                st.markdown("""
+                ### What is CEC/WAM?
+                
+                **CEC/WAM (Wide Area Monitoring)** is a real-time data monitoring and aggregation system that:
+                
+                - 🔄 **Live Data Sync**: Automatically fetches data from Google Sheets
+                - 🎨 **Color-Coded Status**: Visual indicators for system states
+                - 📊 **Analytics**: Real-time status distribution and metrics
+                - 💾 **Data Export**: Export live data for offline analysis
+                - ⚡ **Auto-Refresh**: Keeps data fresh with periodic updates
+                
+                ### Status System
+                
+                - 🟢 **PERFECT**: System operating optimally
+                - 🟡 **TODO**: Items requiring attention
+                - 🔵 **ACTIVE**: Currently processing or in progress
+                - ⚪ **STABLE**: System in stable state
+                
+                ### Setup Instructions
+                
+                1. Create a Google Sheet with your data
+                2. Make it publicly accessible (Share → Anyone with link can view)
+                3. Set environment variable: `CEC_WAM_SHEET_URL=your_sheet_url`
+                4. Restart the application
+                
+                ### Expected Data Format
+                
+                Your Google Sheet should include at least these columns:
+                - **Status**: PERFECT, TODO, ACTIVE, or STABLE
+                - Any additional columns for your data
+                """)
+    
+    with tab3:
         st.header("Holdings & Valuation")
         
         # Calculate holdings if we have price data
@@ -239,7 +430,7 @@ def main():
         else:
             st.warning("⚠️ Token price data not available. Holdings calculation unavailable.")
     
-    with tab3:
+    with tab4:
         st.header("CSV Data Management")
         
         # Load CSV files
@@ -275,7 +466,7 @@ def main():
             except Exception as e:
                 st.error(f"❌ Error loading file: {e}")
     
-    with tab4:
+    with tab5:
         st.header("About PSI-Coin Monitor")
         
         st.markdown("""
@@ -286,6 +477,11 @@ def main():
         - **Real-time Data**: Live updates every 30 seconds
         - **Wallet Monitoring**: Track SOL balance in real-time
         - **Token Tracking**: Monitor PSI-Coin metadata and pricing
+        - **CEC/WAM System**: Live data synchronization with Google Sheets
+          - Color-coded status indicators (PERFECT, TODO, ACTIVE, STABLE)
+          - Real-time status distribution analytics
+          - Auto-refresh every 5 minutes
+          - Data export capabilities
         - **CSV Integration**: Import and manage pump.fun.csv data
         - **Holdings Calculator**: Calculate portfolio valuation
         - **Data Export**: Export holdings and metrics to CSV
@@ -295,6 +491,13 @@ def main():
         - **RPC Endpoint**: `api.mainnet-beta.solana.com`
         - **Token Standard**: SPL Token
         - **Data Source**: Solscan Public API
+        
+        ### 🌐 CEC/WAM System
+        - **Purpose**: Wide Area Monitoring for real-time data aggregation
+        - **Data Source**: Google Sheets (CSV export)
+        - **Refresh Rate**: 5 minutes (300 seconds)
+        - **Status Codes**: PERFECT (🟢), TODO (🟡), ACTIVE (🔵), STABLE (⚪)
+        - **Features**: Live sync, analytics, color-coded indicators, data export
         
         ### 🔒 Security
         - ✅ No hardcoded API keys
@@ -310,7 +513,7 @@ def main():
         
         st.divider()
         
-        st.caption("Built with ❤️ using Streamlit | Version 1.0.0")
+        st.caption("Built with ❤️ using Streamlit | Version 2.0.0 - CEC/WAM Enabled")
     
     # Auto-refresh mechanism
     if auto_refresh:

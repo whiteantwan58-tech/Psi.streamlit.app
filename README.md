@@ -11,6 +11,12 @@ A real-time Solana blockchain monitoring application for PSI-Coin (EVE 1010_WAKE
   - Token Address: `7Avu2LscLpCNNDR8szDowyck3MCBecpCf1wHyjU3pump`
 - 👛 **Wallet Balance Tracking** - Monitor SOL balance in real-time
   - Wallet Address: `b59HHkFpg3g9yBwwLcuDH6z1d6d6z3vdGWX7mkX3txH`
+- 🌐 **CEC/WAM Live Data System** - Wide Area Monitoring with Google Sheets integration
+  - Real-time data synchronization from Google Sheets
+  - Color-coded status system (PERFECT 🟢, TODO 🟡, ACTIVE 🔵, STABLE ⚪)
+  - Status distribution analytics
+  - Auto-refresh every 5 minutes
+  - Data export capabilities
 - 📊 **Live Data Fetching** - Integration with Solscan API
 - 📁 **CSV Data Management** - Load and manage pump.fun.csv data
 - 💾 **Data Export** - Export holdings and metrics to CSV
@@ -46,12 +52,18 @@ A real-time Solana blockchain monitoring application for PSI-Coin (EVE 1010_WAKE
    cp .env.example .env
    ```
    
-   Edit `.env` and add your GROQ API key (if needed):
+   Edit `.env` and add your configuration:
    ```
+   # Optional: GROQ API key for future AI features
    GROQ_API_KEY=your_actual_groq_api_key_here
+   
+   # Optional: CEC/WAM System - Google Sheets URL for live data
+   CEC_WAM_SHEET_URL=https://docs.google.com/spreadsheets/d/YOUR_SHEET_ID/edit
    ```
    
-   > **Note**: The GROQ_API_KEY is optional. The app will work without it as it's reserved for future AI features.
+   > **Note**: 
+   > - The GROQ_API_KEY is optional and reserved for future AI features.
+   > - The CEC_WAM_SHEET_URL enables the live data monitoring system.
 
 4. **Run the application**
    ```bash
@@ -81,15 +93,18 @@ A real-time Solana blockchain monitoring application for PSI-Coin (EVE 1010_WAKE
 
 ### Step 3: Configure Secrets (Optional)
 
-If you want to use GROQ features:
+If you want to use GROQ features or enable CEC/WAM live data:
 
 1. In Streamlit Cloud dashboard, click on your app
 2. Go to "Settings" → "Secrets"
 3. Add your secrets in TOML format:
    ```toml
    GROQ_API_KEY = "your_actual_groq_api_key_here"
+   CEC_WAM_SHEET_URL = "https://docs.google.com/spreadsheets/d/YOUR_SHEET_ID/edit"
    ```
 4. Save and restart the app
+
+> **Note**: For CEC/WAM to work, your Google Sheet must be publicly accessible (Share → Anyone with link can view)
 
 ## 🔒 Security Notes
 
@@ -111,6 +126,58 @@ If you want to use GROQ features:
 - CSV files are excluded from Git to prevent accidental exposure of sensitive data
 - Only `example.csv` would be tracked if present
 - Ensure CSV files don't contain sensitive personal information before loading
+
+## 🌐 CEC/WAM Live Data System
+
+### What is CEC/WAM?
+
+**CEC/WAM (Wide Area Monitoring)** is a real-time data monitoring and aggregation system that enables:
+
+- **Live Data Synchronization**: Automatically fetches data from Google Sheets every 5 minutes
+- **Color-Coded Status System**: Visual indicators for quick status assessment
+  - 🟢 **PERFECT**: System operating optimally
+  - 🟡 **TODO**: Items requiring attention
+  - 🔵 **ACTIVE**: Currently processing or in progress
+  - ⚪ **STABLE**: System in stable state
+- **Real-time Analytics**: Status distribution metrics and trends
+- **Data Export**: Download live data for offline analysis
+- **Auto-Refresh**: Keeps data fresh with automatic periodic updates
+
+### Setting Up CEC/WAM
+
+1. **Create a Google Sheet** with your monitoring data
+   - Include a "Status" column with values: PERFECT, TODO, ACTIVE, or STABLE
+   - Add any additional columns for your data
+
+2. **Make the sheet publicly accessible**
+   - Click "Share" in your Google Sheet
+   - Set to "Anyone with the link can view"
+
+3. **Get the sheet URL**
+   - Copy the full Google Sheets URL
+   - Example: `https://docs.google.com/spreadsheets/d/1ABC123xyz/edit`
+
+4. **Configure the application**
+   - Local: Add `CEC_WAM_SHEET_URL` to your `.env` file
+   - Streamlit Cloud: Add to Secrets in TOML format
+
+5. **Restart and access**
+   - Restart the application
+   - Navigate to the "🌐 CEC/WAM Live" tab
+
+### CEC/WAM Data Format
+
+Your Google Sheet should include these columns:
+
+```csv
+Status,Component,Description,Value,Timestamp
+PERFECT,System A,Operating normally,100,2026-02-14 10:00:00
+TODO,System B,Requires update,85,2026-02-14 10:00:00
+ACTIVE,System C,Processing data,92,2026-02-14 10:00:00
+STABLE,System D,Idle state,78,2026-02-14 10:00:00
+```
+
+The "Status" column is required for color-coding. All other columns are flexible based on your needs.
 
 ## 📁 CSV File Requirements
 
@@ -175,7 +242,17 @@ For issues, questions, or suggestions:
 
 ## 🔄 Version History
 
-### v1.0.0 (Current)
+### v2.0.0 (Current - CEC/WAM Enabled)
+- ✅ Added CEC/WAM (Wide Area Monitoring) live data system
+- ✅ Google Sheets integration for real-time data synchronization
+- ✅ Color-coded status indicators (PERFECT, TODO, ACTIVE, STABLE)
+- ✅ Status distribution analytics and metrics
+- ✅ Auto-refresh every 5 minutes for live data
+- ✅ Data export functionality for CEC/WAM data
+- ✅ Enhanced documentation and configuration options
+- ✅ Fixed all existing code errors
+
+### v1.0.0
 - Initial release with full Solana blockchain monitoring
 - PSI-Coin token tracking
 - Real-time wallet balance monitoring
