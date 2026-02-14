@@ -14,7 +14,6 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import requests
-import time
 from datetime import datetime, timedelta
 import os
 import json
@@ -152,17 +151,17 @@ SOLANA_RPC_URL = "https://api.mainnet-beta.solana.com"
 # Google Sheets Configuration (from secrets or env)
 try:
     CEC_WAM_SHEET_URL = st.secrets.get("CEC_WAM_SHEET_URL", "")
-except:
+except Exception:
     CEC_WAM_SHEET_URL = os.environ.get("CEC_WAM_SHEET_URL", "")
 
 # GROQ API Configuration
 try:
     GROQ_API_KEY = st.secrets.get("GROQ_API_KEY", "")
-except:
+except Exception:
     GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 
 # Key dates for milestone tracking
-MISSION_START_DATE = datetime(2024, 11, 6)  # Nov 6 mission start
+MISSION_START_DATE = datetime(2024, 11, 6)  # Nov 6, 2024 - PSI token launch and mission start date
 
 # Constants for calculations
 GOLDEN_RATIO = 1.618
@@ -304,7 +303,7 @@ def get_psi_token_price() -> dict:
                             "source": source,
                             "timestamp": datetime.now().isoformat()
                         }
-            except:
+            except Exception:
                 continue
         
         # Fallback to simulated bonding curve
@@ -333,7 +332,7 @@ def parse_price_from_source(data: dict, source: str) -> float:
             return float(data["pairs"][0]["priceUsd"])
         elif "birdeye" in source and "data" in data:
             return float(data["data"]["value"])
-    except:
+    except (KeyError, IndexError, ValueError, TypeError):
         pass
     return None
 
@@ -440,6 +439,11 @@ def chat_with_eve(user_message: str) -> str:
     """
     Chat with EVE AI using Groq API
     Context-aware responses about PSI coin, system health, quantum calculations
+    
+    NOTE: Currently uses placeholder logic. Full GROQ API integration requires:
+    - Installing groq package: pip install groq
+    - Making actual API calls to GROQ endpoint
+    - See: https://console.groq.com/docs for implementation details
     """
     if not GROQ_API_KEY or GROQ_API_KEY.strip() == "":
         return "⚠️ EVE AI unavailable: GROQ_API_KEY not configured"
@@ -664,7 +668,7 @@ def main():
         
         # Calculate completion based on implemented features
         total_features = 17
-        implemented_features = 8  # Update as features are added
+        implemented_features = 8  # TODO: Update this value when adding new features (see DEPLOYMENT.md checklist)
         completion = (implemented_features / total_features) * 100
         
         create_progress_bar_with_emoji(completion, 100, "Sovereign System Completion", "🚀")
@@ -1033,9 +1037,11 @@ def main():
         </p>
         """, unsafe_allow_html=True)
     
-    # Auto-refresh mechanism
-    time.sleep(BLOCKCHAIN_REFRESH)
-    st.rerun()
+    # Auto-refresh using Streamlit's rerun mechanism
+    # Note: Use browser auto-refresh or manual refresh button for production
+    # Uncomment the following lines to enable auto-refresh (may impact user experience):
+    # time.sleep(BLOCKCHAIN_REFRESH)
+    # st.rerun()
 
 # =============================================================================
 # ENTRY POINT

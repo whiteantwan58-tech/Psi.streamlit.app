@@ -137,7 +137,13 @@ def show_lock_screen():
     
     if submit:
         if username.lower() in AUTHORIZED_USERS:
-            # In production, verify access_code against secure hash
+            # SECURITY WARNING: Production implementation must verify access_code against secure hash
+            # TODO: Implement proper authentication:
+            # 1. Store password hashes using bcrypt or argon2
+            # 2. Verify access_code against stored hash
+            # 3. Add rate limiting to prevent brute force
+            # 4. Log failed authentication attempts
+            # Example: bcrypt.checkpw(access_code.encode(), stored_hash)
             st.session_state.authenticated = True
             st.session_state.current_user = username
             st.success(f"✅ Access Granted: {username}")
