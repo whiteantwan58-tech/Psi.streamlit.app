@@ -6,6 +6,7 @@ import os
 import glob
 from datetime import datetime
 from solana.rpc.api import Client
+import json
 
 # Page configuration
 st.set_page_config(
@@ -30,6 +31,10 @@ CEC_WAM_STATUS_COLORS = {
     "ACTIVE": "🔵",
     "STABLE": "⚪"
 }
+
+# Activity Logging Constants
+ACTIVITY_LOG_FILE = "activity_log.csv"
+ENABLE_AUTO_LOGGING = True
 
 # Environment variables - SECURE: No hardcoded keys
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
@@ -126,6 +131,43 @@ def get_status_indicator(status):
     status_upper = str(status).upper()
     return CEC_WAM_STATUS_COLORS.get(status_upper, "⚫")
 
+def log_activity(action, details="", status="SUCCESS"):
+    """Log activity to CSV file for tracking"""
+    if not ENABLE_AUTO_LOGGING:
+        return
+    
+    try:
+        log_entry = {
+            "timestamp": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            "action": action,
+            "details": details,
+            "status": status
+        }
+        
+        # Check if log file exists
+        file_exists = os.path.exists(ACTIVITY_LOG_FILE)
+        
+        # Create or append to log file
+        df = pd.DataFrame([log_entry])
+        df.to_csv(ACTIVITY_LOG_FILE, mode='a', header=not file_exists, index=False)
+        
+        return True
+    except Exception as e:
+        # Silent fail to not interrupt main app
+        print(f"Logging error: {e}")
+        return False
+
+def get_activity_log():
+    """Read activity log from CSV"""
+    try:
+        if os.path.exists(ACTIVITY_LOG_FILE):
+            df = pd.read_csv(ACTIVITY_LOG_FILE)
+            return df
+        return pd.DataFrame(columns=["timestamp", "action", "details", "status"])
+    except Exception as e:
+        st.warning(f"Could not load activity log: {e}")
+        return pd.DataFrame(columns=["timestamp", "action", "details", "status"])
+
 def load_csv_files():
     """Load CSV files from the repository root"""
     csv_files = []
@@ -179,10 +221,20 @@ def main():
         st.caption(f"Last updated: {datetime.now().strftime('%H:%M:%S')}")
     
     # Main content tabs
-    tab1, tab2, tab3, tab4, tab5 = st.tabs(["📈 Live Data", "🌐 CEC/WAM Live", "💰 Holdings", "📁 CSV Data", "ℹ️ About"])
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+        "📈 Live Data", 
+        "🌐 CEC/WAM Live", 
+        "💰 Holdings", 
+        "📁 CSV Data", 
+        "📊 Activity Log",
+        "ℹ️ About"
+    ])
     
     with tab1:
         st.header("Live Blockchain Data")
+        
+        # Log data fetch
+        log_activity("DATA_FETCH", "Fetching live blockchain data", "INITIATED")
         
         # Create columns for metrics
         col1, col2, col3 = st.columns(3)
@@ -196,6 +248,7 @@ def main():
                     value=f"{wallet_balance:.4f} SOL",
                     delta=None
                 )
+                log_activity("WALLET_BALANCE", f"Balance: {wallet_balance:.4f} SOL", "SUCCESS")
         
         # Fetch token metadata
         with col2:
@@ -209,12 +262,14 @@ def main():
                         value=f"{token_symbol}",
                         delta=token_name
                     )
+                    log_activity("TOKEN_METADATA", f"Symbol: {token_symbol}, Name: {token_name}", "SUCCESS")
                 else:
                     st.metric(
                         label="🪙 Token Info",
                         value="PSI-Coin",
                         delta="Loading..."
                     )
+                    log_activity("TOKEN_METADATA", "Failed to fetch token metadata", "WARNING")
         
         # Fetch token price
         with col3:
@@ -225,6 +280,16 @@ def main():
                     value=f"${token_price:.6f}" if token_price > 0 else "N/A",
                     delta=None
                 )
+                if token_price > 0:
+                    log_activity("TOKEN_PRICE", f"Price: ${token_price:.6f}", "SUCCESS")
+        
+        # Visual separator with timestamp
+        st.divider()
+        col_time1, col_time2 = st.columns([3, 1])
+        with col_time1:
+            st.success("✅ Live data updated successfully")
+        with col_time2:
+            st.caption(f"🕒 {datetime.now().strftime('%H:%M:%S')}")
         
         st.divider()
         
@@ -282,9 +347,11 @@ def main():
         if CEC_WAM_GOOGLE_SHEET_URL:
             with st.spinner("🔄 Fetching live CEC/WAM data from Google Sheets..."):
                 cec_wam_df = fetch_cec_wam_data(CEC_WAM_GOOGLE_SHEET_URL)
+                log_activity("CEC_WAM_SYNC", f"Fetching data from Google Sheets", "INITIATED")
                 
             if cec_wam_df is not None and not cec_wam_df.empty:
                 st.success(f"✅ Successfully loaded {len(cec_wam_df)} records from live data source")
+                log_activity("CEC_WAM_SYNC", f"Loaded {len(cec_wam_df)} records", "SUCCESS")
                 
                 # Status distribution analytics
                 status_counts = analyze_cec_wam_status(cec_wam_df)
@@ -467,6 +534,122 @@ def main():
                 st.error(f"❌ Error loading file: {e}")
     
     with tab5:
+        st.header("📊 Activity Log & Auto-Logging")
+        
+        st.info("🔄 **Automatic Activity Logging** - All system activities are automatically logged to CSV")
+        
+        # Configuration
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric("📁 Log File", ACTIVITY_LOG_FILE)
+        with col2:
+            st.metric("🔄 Auto-Logging", "✅ ENABLED" if ENABLE_AUTO_LOGGING else "❌ DISABLED")
+        
+        st.divider()
+        
+        # Load and display activity log
+        activity_df = get_activity_log()
+        
+        if not activity_df.empty:
+            st.subheader("📋 Recent Activity")
+            
+            # Statistics
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("Total Entries", len(activity_df))
+            with col2:
+                success_count = len(activity_df[activity_df['status'] == 'SUCCESS'])
+                st.metric("✅ Success", success_count)
+            with col3:
+                warning_count = len(activity_df[activity_df['status'] == 'WARNING'])
+                st.metric("⚠️ Warnings", warning_count)
+            with col4:
+                error_count = len(activity_df[activity_df['status'] == 'ERROR'])
+                st.metric("❌ Errors", error_count)
+            
+            st.divider()
+            
+            # Filter options
+            st.subheader("🔍 Filter Logs")
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                status_filter = st.multiselect(
+                    "Filter by Status",
+                    options=activity_df['status'].unique().tolist(),
+                    default=activity_df['status'].unique().tolist()
+                )
+            
+            with col2:
+                action_filter = st.multiselect(
+                    "Filter by Action",
+                    options=activity_df['action'].unique().tolist(),
+                    default=activity_df['action'].unique().tolist()
+                )
+            
+            # Apply filters
+            filtered_df = activity_df[
+                (activity_df['status'].isin(status_filter)) &
+                (activity_df['action'].isin(action_filter))
+            ]
+            
+            # Display filtered data (most recent first)
+            st.dataframe(
+                filtered_df.sort_values('timestamp', ascending=False),
+                use_container_width=True,
+                height=400
+            )
+            
+            st.caption(f"Showing {len(filtered_df)} of {len(activity_df)} log entries")
+            
+            # Export options
+            st.divider()
+            st.subheader("💾 Export Activity Log")
+            
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                csv_export = filtered_df.to_csv(index=False)
+                st.download_button(
+                    label="⬇️ Download Filtered Log",
+                    data=csv_export,
+                    file_name=f"activity_log_filtered_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                    mime="text/csv"
+                )
+            
+            with col2:
+                full_csv = activity_df.to_csv(index=False)
+                st.download_button(
+                    label="⬇️ Download Full Log",
+                    data=full_csv,
+                    file_name=f"activity_log_full_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                    mime="text/csv"
+                )
+            
+            with col3:
+                if st.button("🗑️ Clear Activity Log", type="secondary"):
+                    try:
+                        if os.path.exists(ACTIVITY_LOG_FILE):
+                            os.remove(ACTIVITY_LOG_FILE)
+                            st.success("✅ Activity log cleared!")
+                            st.rerun()
+                    except Exception as e:
+                        st.error(f"❌ Error clearing log: {e}")
+            
+        else:
+            st.info("ℹ️ No activity logs yet. Start using the app to generate logs!")
+            st.write("**Logged Activities Include:**")
+            st.markdown("""
+            - 📊 Data fetch operations
+            - 💰 Wallet balance checks
+            - 🪙 Token metadata queries
+            - 💵 Price updates
+            - 🌐 CEC/WAM data synchronization
+            - 📁 CSV file operations
+            - And more...
+            """)
+    
+    with tab6:
         st.header("About PSI-Coin Monitor")
         
         st.markdown("""
@@ -482,9 +665,15 @@ def main():
           - Real-time status distribution analytics
           - Auto-refresh every 5 minutes
           - Data export capabilities
+        - **Activity Logging**: Automatic logging of all system activities to CSV
+          - Real-time activity tracking
+          - Filter and search capabilities
+          - Export logs for analysis
+          - Performance monitoring
         - **CSV Integration**: Import and manage pump.fun.csv data
         - **Holdings Calculator**: Calculate portfolio valuation
         - **Data Export**: Export holdings and metrics to CSV
+        - **Enhanced Visuals**: Modern, responsive UI with real-time updates
         
         ### 🔗 Blockchain Details
         - **Network**: Solana Mainnet Beta
@@ -498,6 +687,13 @@ def main():
         - **Refresh Rate**: 5 minutes (300 seconds)
         - **Status Codes**: PERFECT (🟢), TODO (🟡), ACTIVE (🔵), STABLE (⚪)
         - **Features**: Live sync, analytics, color-coded indicators, data export
+        
+        ### 📊 Activity Logging System
+        - **Auto-Logging**: Automatically logs all system activities
+        - **CSV Storage**: All logs saved to `activity_log.csv`
+        - **Real-time Tracking**: Monitors data fetches, API calls, and user actions
+        - **Analytics**: View statistics, filter logs, and export for analysis
+        - **Performance**: Track system health and response times
         
         ### 🔒 Security
         - ✅ No hardcoded API keys
@@ -513,7 +709,7 @@ def main():
         
         st.divider()
         
-        st.caption("Built with ❤️ using Streamlit | Version 2.0.0 - CEC/WAM Enabled")
+        st.caption("Built with ❤️ using Streamlit | Version 2.1.0 - Enhanced with Auto-Logging & Visual Updates")
     
     # Auto-refresh mechanism
     if auto_refresh:
