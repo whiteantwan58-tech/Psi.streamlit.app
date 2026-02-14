@@ -7,6 +7,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import time
+import os
 from datetime import datetime, timedelta
 import plotly.graph_objects as go
 import plotly.express as px
@@ -228,7 +229,8 @@ def log_activity(action: str, details: str, status: str):
     # Save to CSV
     try:
         df = pd.DataFrame([log_entry])
-        df.to_csv('activity_log.csv', mode='a', header=not pd.io.common.file_exists('activity_log.csv'), index=False)
+        file_exists = os.path.exists('activity_log.csv')
+        df.to_csv('activity_log.csv', mode='a', header=not file_exists, index=False)
     except Exception as e:
         print(f"Error saving activity log: {e}")
 
