@@ -146,13 +146,17 @@ def log_activity(action, details="", status="SUCCESS"):
         # Check if log file exists
         file_exists = os.path.exists(ACTIVITY_LOG_FILE)
         
-        # Create or append to log file
+        # Create or append to log file with proper error handling
+        # Using mode='a' (append) with immediate flush for better thread safety
         df = pd.DataFrame([log_entry])
-        df.to_csv(ACTIVITY_LOG_FILE, mode='a', header=not file_exists, index=False)
+        
+        # Write with explicit encoding and immediate flush
+        with open(ACTIVITY_LOG_FILE, 'a', newline='', encoding='utf-8') as f:
+            df.to_csv(f, mode='a', header=not file_exists, index=False)
         
         return True
     except Exception as e:
-        # Silent fail to not interrupt main app
+        # Silent fail to not interrupt main app, but log to console for debugging
         print(f"Logging error: {e}")
         return False
 
@@ -289,6 +293,9 @@ def main():
             st.success("✅ Live data updated successfully")
         with col_time2:
             st.caption(f"🕒 {datetime.now().strftime('%H:%M:%S')}")
+        
+        # Log completion of data fetch
+        log_activity("DATA_FETCH", "Live blockchain data fetched successfully", "SUCCESS")
         
         st.divider()
         
