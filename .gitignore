@@ -9,6 +9,12 @@
 !example.csv
 !example_cec_wam.csv
 
+# Activity logs and backup files
+activity_log.csv
+!example_activity_log.csv
+*_old.py
+*_backup.py
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
