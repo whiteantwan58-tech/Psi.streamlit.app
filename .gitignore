@@ -11,6 +11,7 @@
 
 # Activity logs and backup files
 activity_log.csv
+!example_activity_log.csv
 *_old.py
 *_backup.py
 
