@@ -6,7 +6,6 @@ import os
 import glob
 from datetime import datetime
 from solana.rpc.api import Client
-import json
 
 # Page configuration
 st.set_page_config(
