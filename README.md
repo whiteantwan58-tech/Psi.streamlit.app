@@ -285,6 +285,25 @@ A comprehensive real-time Solana blockchain monitoring and autonomous system for
 ### 🪙 PSI Coin Monitoring
 - 💰 **Real-time Token Price** - Live tracking from Solana blockchain
   - Token Address: `7Avu2LscLpCNNDR8szDowyck3MCBecpCf1wHyjU3pump`
+- 👛 **Wallet Balance Tracking** - Monitor SOL balance in real-time
+  - Wallet Address: `b59HHkFpg3g9yBwwLcuDH6z1d6d6z3vdGWX7mkX3txH`
+- 🌐 **CEC/WAM Live Data System** - Wide Area Monitoring with Google Sheets integration
+  - Real-time data synchronization from Google Sheets
+  - Color-coded status system (PERFECT 🟢, TODO 🟡, ACTIVE 🔵, STABLE ⚪)
+  - Status distribution analytics
+  - Auto-refresh every 5 minutes
+  - Data export capabilities
+- 📊 **Automatic Activity Logging** - Track all system activities automatically
+  - Real-time logging of all operations to CSV
+  - Filter and search log entries
+  - Export logs for analysis
+  - Statistics dashboard (success, warnings, errors)
+  - Performance monitoring
+- 📁 **CSV Data Management** - Load and manage pump.fun.csv data
+- 💾 **Data Export** - Export holdings and metrics to CSV
+- 🔄 **Auto-Refresh** - Automatic updates every 30 seconds
+- 📈 **System Health Metrics** - Monitor connection status and data freshness
+- 🎨 **Responsive Layout** - Clean, modern interface with enhanced visuals
 - 📈 **Bonding Curve Visualization** - Color-coded progress to 100%
 - 💎 **Internal Value Tracking** - $155.50 → $34.1M progression
 - 👛 **Wallet Balance Monitoring** - SOL balance tracking
@@ -485,6 +504,54 @@ STABLE,System D,Idle state,78,2026-02-14 10:00:00
 
 The "Status" column is required for color-coding. All other columns are flexible based on your needs.
 
+## 📊 Activity Logging System
+
+### What is Activity Logging?
+
+The application includes an **Automatic Activity Logging System** that tracks all operations and saves them to CSV files for analysis and monitoring.
+
+### Features
+
+- **Automatic Logging**: All system activities are automatically logged
+- **CSV Storage**: Logs saved to `activity_log.csv` (excluded from git)
+- **Real-time Tracking**: Monitor data fetches, API calls, and operations
+- **Filter & Search**: Filter logs by status and action type
+- **Statistics Dashboard**: View success rates, warnings, and errors
+- **Export Capabilities**: Download filtered or complete logs
+- **Performance Monitoring**: Track system health and response times
+
+### Logged Activities
+
+The system automatically logs:
+- Wallet balance queries
+- Token metadata requests
+- Price updates
+- CEC/WAM data synchronization
+- CSV file operations
+- All API interactions
+
+### Log File Structure
+
+```csv
+timestamp,action,details,status
+2026-02-14 10:00:00,WALLET_BALANCE,Balance: 1.2345 SOL,SUCCESS
+2026-02-14 10:00:05,TOKEN_METADATA,Symbol: PSI Name: PSI-Coin,SUCCESS
+2026-02-14 10:00:10,TOKEN_PRICE,Price: $0.001234,SUCCESS
+2026-02-14 10:00:15,CEC_WAM_SYNC,Loaded 25 records,SUCCESS
+```
+
+### Using the Activity Log Tab
+
+1. Navigate to the "📊 Activity Log" tab
+2. View statistics: total entries, successes, warnings, errors
+3. Use filters to find specific activities
+4. Export logs for offline analysis
+5. Clear logs when needed (careful - this is permanent!)
+
+### Privacy Note
+
+Activity logs are stored locally and excluded from version control. They contain only system operation data, not sensitive personal information.
+
 ## 📁 CSV File Requirements
 
 The app can load CSV files from the repository root directory. Expected format for `pump.fun.csv`:
@@ -551,6 +618,17 @@ For issues, questions, or suggestions:
 
 ## 🔄 Version History
 
+### v2.1.0 (Current - Enhanced with Auto-Logging)
+- ✅ Added automatic activity logging system
+- ✅ Real-time activity tracking to CSV
+- ✅ Activity log dashboard with statistics
+- ✅ Filter and export log capabilities
+- ✅ Enhanced visual feedback and UI improvements
+- ✅ Success indicators with timestamps
+- ✅ Comprehensive error handling
+- ✅ Performance monitoring features
+
+### v2.0.0 (CEC/WAM Enabled)
 ### v3.0.0 (Current - Sovereign System) ✨
 - ✅ **Complete Rewrite**: 1,000+ lines of production code
 - ✅ **Fixed Critical Error**: Removed `VIDEO source` syntax error

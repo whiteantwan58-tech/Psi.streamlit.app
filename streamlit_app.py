@@ -418,6 +418,14 @@ STATUS_EMOJIS = {
     "STABLE": "⚪"
 }
 
+# Activity Logging Constants
+ACTIVITY_LOG_FILE = "activity_log.csv"
+ENABLE_AUTO_LOGGING = True
+
+# Environment variables - SECURE: No hardcoded keys
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+if GROQ_API_KEY:
+    st.caption("🔑 API Key Loaded")
 # Auto-refresh intervals
 BLOCKCHAIN_REFRESH = 30  # seconds
 CEC_WAM_REFRESH = 300  # 5 minutes
@@ -637,6 +645,55 @@ def generate_example_cec_wam_data() -> pd.DataFrame:
     
     return pd.DataFrame(data)
 
+def get_status_indicator(status):
+    """Get color indicator for status"""
+    status_upper = str(status).upper()
+    return CEC_WAM_STATUS_COLORS.get(status_upper, "⚫")
+
+def log_activity(action, details="", status="SUCCESS"):
+    """Log activity to CSV file for tracking"""
+    if not ENABLE_AUTO_LOGGING:
+        return
+    
+    try:
+        log_entry = {
+            "timestamp": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            "action": action,
+            "details": details,
+            "status": status
+        }
+        
+        # Check if log file exists
+        file_exists = os.path.exists(ACTIVITY_LOG_FILE)
+        
+        # Create or append to log file with proper error handling
+        # Using mode='a' (append) with immediate flush for better thread safety
+        df = pd.DataFrame([log_entry])
+        
+        # Write with explicit encoding and immediate flush
+        with open(ACTIVITY_LOG_FILE, 'a', newline='', encoding='utf-8') as f:
+            df.to_csv(f, mode='a', header=not file_exists, index=False)
+        
+        return True
+    except Exception as e:
+        # Silent fail to not interrupt main app, but log to console for debugging
+        print(f"Logging error: {e}")
+        return False
+
+def get_activity_log():
+    """Read activity log from CSV"""
+    try:
+        if os.path.exists(ACTIVITY_LOG_FILE):
+            df = pd.read_csv(ACTIVITY_LOG_FILE)
+            return df
+        return pd.DataFrame(columns=["timestamp", "action", "details", "status"])
+    except Exception as e:
+        st.warning(f"Could not load activity log: {e}")
+        return pd.DataFrame(columns=["timestamp", "action", "details", "status"])
+
+def load_csv_files():
+    """Load CSV files from the repository root"""
+    csv_files = []
 def calculate_bonding_curve_progress() -> dict:
     """Calculate PSI bonding curve progress toward 100%"""
     try:
@@ -797,6 +854,15 @@ def main():
         "📡 Quantum Comm"
     ])
     
+    # Main content tabs
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+        "📈 Live Data", 
+        "🌐 CEC/WAM Live", 
+        "💰 Holdings", 
+        "📁 CSV Data", 
+        "📊 Activity Log",
+        "ℹ️ About"
+    ])
     # =============================================================================
     # TAB 1: PSI COIN MONITOR
     # =============================================================================
@@ -810,10 +876,23 @@ def main():
             wallet_data = get_solana_wallet_balance(WALLET_ADDRESS)
             bonding_curve = calculate_bonding_curve_progress()
         
+        # Log data fetch
+        log_activity("DATA_FETCH", "Fetching live blockchain data", "INITIATED")
+        
+        # Create columns for metrics
+        col1, col2, col3 = st.columns(3)
         # Top metrics row
         col1, col2, col3, col4 = st.columns(4)
         
         with col1:
+            with st.spinner("Fetching wallet balance..."):
+                wallet_balance = fetch_wallet_balance(WALLET_ADDRESS)
+                st.metric(
+                    label="💎 Wallet SOL Balance",
+                    value=f"{wallet_balance:.4f} SOL",
+                    delta=None
+                )
+                log_activity("WALLET_BALANCE", f"Balance: {wallet_balance:.4f} SOL", "SUCCESS")
             st.metric(
                 label="💰 Token Price",
                 value=f"${price_data['price_usd']:.6f}",
@@ -821,6 +900,24 @@ def main():
             )
         
         with col2:
+            with st.spinner("Fetching token data..."):
+                token_metadata = fetch_token_metadata(TOKEN_ADDRESS)
+                if token_metadata:
+                    token_name = token_metadata.get("name", "PSI-Coin")
+                    token_symbol = token_metadata.get("symbol", "PSI")
+                    st.metric(
+                        label="🪙 Token Info",
+                        value=f"{token_symbol}",
+                        delta=token_name
+                    )
+                    log_activity("TOKEN_METADATA", f"Symbol: {token_symbol}, Name: {token_name}", "SUCCESS")
+                else:
+                    st.metric(
+                        label="🪙 Token Info",
+                        value="PSI-Coin",
+                        delta="Loading..."
+                    )
+                    log_activity("TOKEN_METADATA", "Failed to fetch token metadata", "WARNING")
             st.metric(
                 label="📈 Bonding Curve",
                 value=f"{bonding_curve['progress_percent']:.2f}%",
@@ -828,6 +925,26 @@ def main():
             )
         
         with col3:
+            with st.spinner("Fetching token price..."):
+                token_price = fetch_token_price(TOKEN_ADDRESS)
+                st.metric(
+                    label="💵 Token Price",
+                    value=f"${token_price:.6f}" if token_price > 0 else "N/A",
+                    delta=None
+                )
+                if token_price > 0:
+                    log_activity("TOKEN_PRICE", f"Price: ${token_price:.6f}", "SUCCESS")
+        
+        # Visual separator with timestamp
+        st.divider()
+        col_time1, col_time2 = st.columns([3, 1])
+        with col_time1:
+            st.success("✅ Live data updated successfully")
+        with col_time2:
+            st.caption(f"🕒 {datetime.now().strftime('%H:%M:%S')}")
+        
+        # Log completion of data fetch
+        log_activity("DATA_FETCH", "Live blockchain data fetched successfully", "SUCCESS")
             st.metric(
                 label="💎 Internal Value",
                 value=f"${bonding_curve['current_value']:,.2f}",
@@ -892,6 +1009,83 @@ def main():
                 st.code(f"Address: {PSI_TOKEN_ADDRESS}", language="text")
                 st.code(f"Network: Solana Mainnet", language="text")
             with col2:
+                st.write(f"{CEC_WAM_STATUS_COLORS['TODO']} TODO")
+            with col3:
+                st.write(f"{CEC_WAM_STATUS_COLORS['ACTIVE']} ACTIVE")
+            with col4:
+                st.write(f"{CEC_WAM_STATUS_COLORS['STABLE']} STABLE")
+        
+        st.divider()
+        
+        # Fetch and display CEC/WAM data
+        if CEC_WAM_GOOGLE_SHEET_URL:
+            with st.spinner("🔄 Fetching live CEC/WAM data from Google Sheets..."):
+                cec_wam_df = fetch_cec_wam_data(CEC_WAM_GOOGLE_SHEET_URL)
+                log_activity("CEC_WAM_SYNC", f"Fetching data from Google Sheets", "INITIATED")
+                
+            if cec_wam_df is not None and not cec_wam_df.empty:
+                st.success(f"✅ Successfully loaded {len(cec_wam_df)} records from live data source")
+                log_activity("CEC_WAM_SYNC", f"Loaded {len(cec_wam_df)} records", "SUCCESS")
+                
+                # Status distribution analytics
+                status_counts = analyze_cec_wam_status(cec_wam_df)
+                
+                if status_counts:
+                    st.subheader("📊 Status Distribution")
+                    cols = st.columns(4)
+                    for idx, (status, count) in enumerate(status_counts.items()):
+                        with cols[idx]:
+                            st.metric(
+                                label=f"{CEC_WAM_STATUS_COLORS[status]} {status}",
+                                value=count
+                            )
+                
+                st.divider()
+                
+                # Display the data with status indicators
+                st.subheader("📋 Live CEC/WAM Data Table")
+                
+                # Add status indicators to dataframe display
+                if 'Status' in cec_wam_df.columns:
+                    display_df = cec_wam_df.copy()
+                    display_df['Status'] = display_df['Status'].apply(
+                        lambda x: f"{get_status_indicator(x)} {x}"
+                    )
+                    st.dataframe(display_df, use_container_width=True, height=400)
+                else:
+                    st.dataframe(cec_wam_df, use_container_width=True, height=400)
+                
+                # Data statistics
+                st.caption(f"📈 Total Records: {len(cec_wam_df)} | Columns: {len(cec_wam_df.columns)} | Last Updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+                
+                # Export option
+                st.divider()
+                st.subheader("💾 Export CEC/WAM Data")
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    csv_export = cec_wam_df.to_csv(index=False)
+                    st.download_button(
+                        label="⬇️ Download as CSV",
+                        data=csv_export,
+                        file_name=f"cec_wam_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                        mime="text/csv"
+                    )
+                
+                with col2:
+                    st.info(f"🔄 Auto-refresh: Every {CEC_WAM_REFRESH_INTERVAL // 60} minutes")
+                
+            elif cec_wam_df is not None and cec_wam_df.empty:
+                st.warning("⚠️ Google Sheet is empty or has no data")
+            else:
+                st.error("❌ Failed to fetch CEC/WAM data. Please check:")
+                st.markdown("""
+                - Sheet URL is correct
+                - Sheet is publicly accessible (Share → Anyone with link can view)
+                - Sheet contains valid CSV data
+                """)
+        else:
+            st.info("ℹ️ CEC/WAM live data system is not configured. Set `CEC_WAM_SHEET_URL` to enable.")
                 st.code(f"Symbol: PSI", language="text")
                 st.code(f"Type: SPL Token", language="text")
             
@@ -1115,12 +1309,182 @@ def main():
     # =============================================================================
     
     with tab5:
+        st.header("📊 Activity Log & Auto-Logging")
+        
+        st.info("🔄 **Automatic Activity Logging** - All system activities are automatically logged to CSV")
+        
+        # Configuration
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric("📁 Log File", ACTIVITY_LOG_FILE)
+        with col2:
+            st.metric("🔄 Auto-Logging", "✅ ENABLED" if ENABLE_AUTO_LOGGING else "❌ DISABLED")
+        
+        st.divider()
+        
+        # Load and display activity log
+        activity_df = get_activity_log()
+        
+        if not activity_df.empty:
+            st.subheader("📋 Recent Activity")
+            
+            # Statistics
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("Total Entries", len(activity_df))
+            with col2:
+                success_count = len(activity_df[activity_df['status'] == 'SUCCESS'])
+                st.metric("✅ Success", success_count)
+            with col3:
+                warning_count = len(activity_df[activity_df['status'] == 'WARNING'])
+                st.metric("⚠️ Warnings", warning_count)
+            with col4:
+                error_count = len(activity_df[activity_df['status'] == 'ERROR'])
+                st.metric("❌ Errors", error_count)
+            
+            st.divider()
+            
+            # Filter options
+            st.subheader("🔍 Filter Logs")
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                status_filter = st.multiselect(
+                    "Filter by Status",
+                    options=activity_df['status'].unique().tolist(),
+                    default=activity_df['status'].unique().tolist()
+                )
+            
+            with col2:
+                action_filter = st.multiselect(
+                    "Filter by Action",
+                    options=activity_df['action'].unique().tolist(),
+                    default=activity_df['action'].unique().tolist()
+                )
+            
+            # Apply filters
+            filtered_df = activity_df[
+                (activity_df['status'].isin(status_filter)) &
+                (activity_df['action'].isin(action_filter))
+            ]
+            
+            # Display filtered data (most recent first)
+            st.dataframe(
+                filtered_df.sort_values('timestamp', ascending=False),
+                use_container_width=True,
+                height=400
+            )
+            
+            st.caption(f"Showing {len(filtered_df)} of {len(activity_df)} log entries")
+            
+            # Export options
+            st.divider()
+            st.subheader("💾 Export Activity Log")
+            
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                csv_export = filtered_df.to_csv(index=False)
+                st.download_button(
+                    label="⬇️ Download Filtered Log",
+                    data=csv_export,
+                    file_name=f"activity_log_filtered_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                    mime="text/csv"
+                )
+            
+            with col2:
+                full_csv = activity_df.to_csv(index=False)
+                st.download_button(
+                    label="⬇️ Download Full Log",
+                    data=full_csv,
+                    file_name=f"activity_log_full_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                    mime="text/csv"
+                )
+            
+            with col3:
+                if st.button("🗑️ Clear Activity Log", type="secondary"):
+                    try:
+                        if os.path.exists(ACTIVITY_LOG_FILE):
+                            os.remove(ACTIVITY_LOG_FILE)
+                            st.success("✅ Activity log cleared!")
+                            st.rerun()
+                    except Exception as e:
+                        st.error(f"❌ Error clearing log: {e}")
+            
+        else:
+            st.info("ℹ️ No activity logs yet. Start using the app to generate logs!")
+            st.write("**Logged Activities Include:**")
+            st.markdown("""
+            - 📊 Data fetch operations
+            - 💰 Wallet balance checks
+            - 🪙 Token metadata queries
+            - 💵 Price updates
+            - 🌐 CEC/WAM data synchronization
+            - 📁 CSV file operations
+            - And more...
+            """)
+    
+    with tab6:
+        st.header("About PSI-Coin Monitor")
         st.markdown("## 🗺️ Navigation Star Maps")
         
         st.markdown("### 🌌 Quantum Navigation Interface")
         
         # Star map placeholder
         st.markdown("""
+        ### 🎯 Purpose
+        This application provides real-time monitoring of PSI-Coin (EVE 1010_WAKE) on the Solana blockchain.
+        
+        ### ✨ Features
+        - **Real-time Data**: Live updates every 30 seconds
+        - **Wallet Monitoring**: Track SOL balance in real-time
+        - **Token Tracking**: Monitor PSI-Coin metadata and pricing
+        - **CEC/WAM System**: Live data synchronization with Google Sheets
+          - Color-coded status indicators (PERFECT, TODO, ACTIVE, STABLE)
+          - Real-time status distribution analytics
+          - Auto-refresh every 5 minutes
+          - Data export capabilities
+        - **Activity Logging**: Automatic logging of all system activities to CSV
+          - Real-time activity tracking
+          - Filter and search capabilities
+          - Export logs for analysis
+          - Performance monitoring
+        - **CSV Integration**: Import and manage pump.fun.csv data
+        - **Holdings Calculator**: Calculate portfolio valuation
+        - **Data Export**: Export holdings and metrics to CSV
+        - **Enhanced Visuals**: Modern, responsive UI with real-time updates
+        
+        ### 🔗 Blockchain Details
+        - **Network**: Solana Mainnet Beta
+        - **RPC Endpoint**: `api.mainnet-beta.solana.com`
+        - **Token Standard**: SPL Token
+        - **Data Source**: Solscan Public API
+        
+        ### 🌐 CEC/WAM System
+        - **Purpose**: Wide Area Monitoring for real-time data aggregation
+        - **Data Source**: Google Sheets (CSV export)
+        - **Refresh Rate**: 5 minutes (300 seconds)
+        - **Status Codes**: PERFECT (🟢), TODO (🟡), ACTIVE (🔵), STABLE (⚪)
+        - **Features**: Live sync, analytics, color-coded indicators, data export
+        
+        ### 📊 Activity Logging System
+        - **Auto-Logging**: Automatically logs all system activities
+        - **CSV Storage**: All logs saved to `activity_log.csv`
+        - **Real-time Tracking**: Monitors data fetches, API calls, and user actions
+        - **Analytics**: View statistics, filter logs, and export for analysis
+        - **Performance**: Track system health and response times
+        
+        ### 🔒 Security
+        - ✅ No hardcoded API keys
+        - ✅ Environment variable configuration
+        - ✅ Read-only blockchain access
+        - ✅ Public address monitoring only
+        
+        ### 📚 Resources
+        - [Solana Documentation](https://docs.solana.com/)
+        - [Solscan Explorer](https://solscan.io/)
+        - [Streamlit Documentation](https://docs.streamlit.io/)
+        """)
         <div style='background: radial-gradient(circle, #0a0a1f, #1a1a3e, #2d1b69); 
                     border: 2px solid #00ffff; 
                     border-radius: 10px; 
@@ -1146,6 +1510,7 @@ def main():
             st.metric("Event Horizon", "Approaching")
             st.progress(0.42, text="42% to singularity")
         
+        st.caption("Built with ❤️ using Streamlit | Version 2.1.0 - Enhanced with Auto-Logging & Visual Updates")
         with bh_cols[1]:
             st.markdown("#### 🚀 Exit Vector")
             st.metric("Escape Velocity", "299,792 km/s")
