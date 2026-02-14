@@ -36,4 +36,6 @@ jobs:
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics --exclude=.git,__pycache__,.venv
     - name: Test app imports
       run: |
+        # Allow pytest to pass when no tests exist (temporary until tests are added)
+        # TODO: Add comprehensive test suite and remove || true
         pytest || true

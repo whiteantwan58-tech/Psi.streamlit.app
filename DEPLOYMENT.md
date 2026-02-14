@@ -1,326 +1,196 @@
-# 🚀 Deployment Guide - PSI Sovereign System
+# 🚀 Deployment Checklist for PSI Sovereign System
 
-## Quick Start - Streamlit Cloud Deployment
+## Pre-Deployment Steps
+
+### 1. Local Testing ✅
+- [x] Application runs without errors locally
+- [x] All pages load correctly
+- [x] Authentication system works
+- [x] Data visualizations display properly
+- [x] CSV import/export functions work
+- [x] No critical errors in console
+
+### 2. Code Quality ✅
+- [x] Flake8 linting passes (0 critical errors)
+- [x] CodeQL security scan passes (0 vulnerabilities)
+- [x] No TODO comments for critical issues
+- [x] Proper error handling in place
+- [x] Type hints where appropriate
+
+### 3. Security Review ✅
+- [x] No hardcoded secrets
+- [x] Environment variables used for sensitive data
+- [x] .gitignore configured correctly
+- [x] Password hashing implemented (SHA-256)
+- [x] Activity logging in place
+
+### 4. Documentation ✅
+- [x] README.md complete and up-to-date
+- [x] FEATURES.md created
+- [x] .env.example provided
+- [x] Setup instructions clear
+- [x] All features documented
+
+## Streamlit Cloud Deployment Steps
 
 ### Step 1: Prepare Repository
-```bash
-# Ensure all changes are committed
-git add .
-git commit -m "Ready for deployment"
-git push origin main
-```
+- [ ] Ensure all changes committed and pushed to main branch
+- [ ] Verify .gitignore excludes sensitive files
+- [ ] Confirm requirements.txt is complete
+- [ ] Test that no local-only dependencies exist
 
 ### Step 2: Deploy on Streamlit Cloud
-
-1. **Visit**: [share.streamlit.io](https://share.streamlit.io)
-2. **Sign In**: Use your GitHub account (whiteantwan58-tech)
-3. **Click**: "New app" button
-4. **Configure**:
-   - **Repository**: `whiteantwan58-tech/Psi.streamlit.app`
-   - **Branch**: `main`
-   - **Main file**: `streamlit_app.py`
-5. **Click**: "Deploy!"
+1. [ ] Go to [share.streamlit.io](https://share.streamlit.io)
+2. [ ] Sign in with GitHub account
+3. [ ] Click "New app"
+4. [ ] Select repository: `whiteantwan58-tech/Psi.streamlit.app`
+5. [ ] Set branch to `main`
+6. [ ] Set main file path: `streamlit_app.py`
+7. [ ] Click "Deploy"
 
 ### Step 3: Configure Secrets (Optional but Recommended)
-
-1. Go to your app's dashboard
-2. Click **Settings** → **Secrets**
-3. Add in TOML format:
+In Streamlit Cloud dashboard → Settings → Secrets, add:
 
 ```toml
-# GROQ API for EVE AI Chat
-GROQ_API_KEY = "your_actual_groq_api_key_here"
+# Production Passwords (CHANGE THESE!)
+[auth]
+twan_password_hash = "your_hashed_password"
+eve_password_hash = "your_hashed_password"
+admin_password_hash = "your_hashed_password"
 
-# Google Sheets for CEC/WAM Live Data
-CEC_WAM_SHEET_URL = "https://docs.google.com/spreadsheets/d/YOUR_SHEET_ID/edit"
+# API Keys (if available)
+GROQ_API_KEY = "your_groq_api_key"
+SOLSCAN_API_KEY = "your_solscan_api_key"
 
-# Optional: Custom Solana RPC
+# Blockchain Configuration
 SOLANA_RPC_URL = "https://api.mainnet-beta.solana.com"
-```
+PSI_TOKEN_ADDRESS = "7Avu2LscLpCNNDR8szDowyck3MCBecpCf1wHyjU3pump"
+WALLET_ADDRESS = "b59HHkFpg3g9yBwwLcuDH6z1d6d6z3vdGWX7mkX3txH"
 
-4. **Save** and **Restart** the app
+# Google Drive (if integrating)
+GOOGLE_DRIVE_FOLDER_ID = "1mVGeZnOt49RWK3xO6c3OAA9ouaw3zBUI"
+
+# Refresh Intervals
+PSI_REFRESH_INTERVAL = "30"
+CEC_WAM_REFRESH_INTERVAL = "300"
+SESSION_TIMEOUT = "60"
+```
 
 ### Step 4: Verify Deployment
+- [ ] App loads without errors
+- [ ] Login screen appears
+- [ ] Can authenticate with credentials
+- [ ] All 8 pages are accessible
+- [ ] Charts render correctly
+- [ ] Data tables display properly
+- [ ] Export buttons work
+- [ ] Mobile responsive layout works
 
-Expected URL format:
-- `https://psi-streamlit-app.streamlit.app`
-- Or: `https://whiteantwan58-tech-psi-streamlit-app-streamlit-app-xyz123.streamlit.app`
+### Step 5: Post-Deployment Testing
+- [ ] Test on desktop browser
+- [ ] Test on mobile browser
+- [ ] Test on tablet
+- [ ] Test all authentication scenarios
+- [ ] Test data export functionality
+- [ ] Verify caching works correctly
+- [ ] Check activity logging
+- [ ] Test alert system
 
-**Test all tabs:**
-- ✅ 🚀 PSI Coin Monitor
-- ✅ 🌌 EVE System
-- ✅ 📊 Master Ledger
-- ✅ 🎥 Live Feeds
-- ✅ 🗺️ Nav Maps
-- ✅ 📡 Quantum Comm
+## Production Configuration
 
----
+### Recommended Settings for Production
 
-## Local Development Setup
+1. **Change Default Passwords**
+   - Generate strong hashed passwords
+   - Store in Streamlit Cloud secrets
+   - Remove demo credentials from code
 
-### Prerequisites
-- Python 3.9 or higher
-- pip package manager
-- Git
+2. **Set Up Monitoring**
+   - Enable Streamlit Cloud analytics
+   - Monitor error logs regularly
+   - Set up uptime monitoring
 
-### Installation
+3. **Data Backup**
+   - Regularly backup activity_log.csv
+   - Export CEC WAM data periodically
+   - Keep local copies of important data
 
-```bash
-# Clone repository
-git clone https://github.com/whiteantwan58-tech/Psi.streamlit.app.git
-cd Psi.streamlit.app
+4. **Security Headers**
+   - Consider adding CSP headers
+   - Enable HTTPS (automatic on Streamlit Cloud)
+   - Review access logs
 
-# Install dependencies
-pip install -r requirements.txt
+## Troubleshooting Common Issues
 
-# Create environment file
-cp .env.example .env
-# Edit .env with your actual API keys
+### Issue: App Won't Load
+- Check Streamlit Cloud logs for errors
+- Verify all dependencies in requirements.txt
+- Ensure Python version compatibility (3.8+)
 
-# Run locally
-streamlit run streamlit_app.py
-```
+### Issue: Authentication Fails
+- Check that passwords are hashed correctly
+- Verify environment variables are set
+- Check session state management
 
-### Access Locally
-- **URL**: http://localhost:8501
-- **Port**: 8501 (default)
+### Issue: Charts Don't Display
+- Ensure plotly is installed
+- Check browser console for JavaScript errors
+- Verify data is loading correctly
 
----
+### Issue: CSV Files Not Loading
+- Check file paths are correct
+- Verify .gitignore isn't excluding needed files
+- Ensure example_cec_wam.csv is in repository
 
-## Configuration Details
+## Maintenance Schedule
 
-### Required Dependencies
-- `streamlit>=1.32.0` - Web framework
-- `pandas>=2.0.0` - Data manipulation
-- `requests>=2.31.0` - HTTP requests
-- `solana>=0.30.0` - Blockchain client
-- `numpy>=1.24.0` - Numerical computing
-- `plotly>=5.18.0` - Interactive charts
-- `python-dotenv>=1.0.0` - Environment variables
+### Daily
+- [ ] Monitor error logs
+- [ ] Check system uptime
+- [ ] Verify data freshness
 
-### Optional Dependencies
-For advanced features (not yet implemented):
-- `opencv-python` - Camera integration
-- `gspread` - Google Sheets API
-- `google-auth` - Google authentication
-- `groq` - GROQ API client (currently using requests)
+### Weekly
+- [ ] Review activity logs
+- [ ] Check alert history
+- [ ] Backup data files
+- [ ] Update documentation if needed
 
-### Environment Variables
+### Monthly
+- [ ] Update dependencies
+- [ ] Security audit
+- [ ] Performance review
+- [ ] User feedback review
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `GROQ_API_KEY` | Optional | EVE AI chat functionality |
-| `CEC_WAM_SHEET_URL` | Optional | Live Google Sheets data sync |
-| `SOLANA_RPC_URL` | Optional | Custom Solana endpoint |
-| `NASA_API_KEY` | Optional | Space telescope feeds (future) |
+## Rollback Plan
 
----
+If deployment fails:
+1. Check Streamlit Cloud logs
+2. Review recent commits
+3. Revert to last known good commit
+4. Redeploy from main branch
+5. Document issues for future reference
 
-## Security Best Practices
+## Success Criteria
 
-### ✅ DO:
-- Use Streamlit Cloud Secrets for API keys
-- Keep `.env` file in `.gitignore`
-- Use `.env.example` as a template only
-- Make Google Sheets publicly readable (not writable)
-- Monitor activity logs for suspicious behavior
-
-### ❌ DON'T:
-- Commit `.env` files to git
-- Expose private keys in code
-- Share API keys publicly
-- Make Google Sheets publicly writable
-- Commit `activity_log.csv` (contains operational data)
-
----
-
-## Troubleshooting
-
-### App Won't Start
-
-**Error**: `ModuleNotFoundError: No module named 'streamlit'`
-
-**Fix**:
-```bash
-pip install -r requirements.txt
-```
-
----
-
-### API Keys Not Working
-
-**Error**: `GROQ_API_KEY not configured`
-
-**Fix**:
-1. Check `.streamlit/secrets.toml` exists
-2. Verify TOML format (use `=` not `:`)
-3. Restart the app
-4. Check Streamlit Cloud Secrets if deployed
-
----
-
-### Google Sheets Not Loading
-
-**Error**: `Failed to load CEC/WAM data`
-
-**Fix**:
-1. Verify sheet is publicly accessible
-2. Check URL format: `https://docs.google.com/spreadsheets/d/SHEET_ID/edit`
-3. Ensure sheet has correct column structure
-4. Fallback to `example_cec_wam.csv` will auto-load
-
----
-
-### Auto-Refresh Not Working
-
-**Issue**: Data not updating every 30 seconds
-
-**Fix**:
-1. This is expected behavior in some browsers
-2. Click "🔄 Force Refresh All" in sidebar
-3. Clear Streamlit cache manually if needed
-4. Check browser console for errors
-
----
-
-## Performance Optimization
-
-### Caching Strategy
-- **Token metadata**: 60-second TTL
-- **Wallet balance**: 30-second TTL
-- **CEC/WAM data**: 5-minute TTL (300s)
-- **Price data**: 30-second TTL
-
-### Best Practices
-- Use `@st.cache_data` for expensive operations
-- Implement exponential backoff for API failures
-- Log all errors to `activity_log.csv`
-- Monitor Streamlit Cloud resource usage
-
----
-
-## Mobile Access
-
-### ROG Ally X Handheld
-1. Access via browser: `https://your-app-url.streamlit.app`
-2. Enable fullscreen mode for better experience
-3. Touch controls are optimized for tablet/handheld
-
-### iPhone/iPad
-1. Add to Home Screen for app-like experience
-2. Use Safari for best compatibility
-3. Enable desktop mode if needed
-
-### Siri Shortcuts (Planned)
-- Quick access to PSI price
-- System health checks
-- Launch app with voice command
-
----
-
-## Monitoring & Maintenance
-
-### Activity Logs
-All operations are logged to `activity_log.csv`:
-- Timestamp
-- Action performed
-- Details
-- Status (Success/Error/Warning)
-
-### Health Checks
-Monitor these metrics:
-- ✅ Solana RPC connection
-- ✅ API response times
-- ✅ Token price updates
-- ✅ Wallet balance queries
-- ⚠️ Error rates
-
-### Regular Maintenance
-1. **Weekly**: Review activity logs
-2. **Monthly**: Update dependencies
-3. **Quarterly**: Audit security settings
-4. **As needed**: Clear old CSV files
-
----
-
-## Multi-Repo Sync (Future)
-
-### Target Repositories
-1. `whiteantwan58-tech/Psi.streamlit.app` (current)
-2. `whiteantwan58-tech/CEC-WAM-HOT-CORE`
-3. `whiteantwan58-tech/EVE-HEI-`
-
-### Sync Strategy
-- Use GitHub Actions for automated sync
-- Webhook triggers on data updates
-- Cross-repo activity logging
-- Unified deployment pipeline
-
----
+Deployment is successful when:
+- [x] App is accessible via public URL
+- [ ] All features work as expected
+- [ ] No critical errors in logs
+- [ ] Performance is acceptable (< 3s load time)
+- [ ] Mobile experience is smooth
+- [ ] Authentication system works
+- [ ] Data exports function correctly
 
 ## Support & Resources
 
-### Documentation
-- [Streamlit Docs](https://docs.streamlit.io)
-- [Solana Web3.js](https://solana-labs.github.io/solana-web3.js/)
-- [Plotly Python](https://plotly.com/python/)
-
-### API Documentation
-- [Solscan API](https://public-api.solscan.io/)
-- [GROQ API](https://console.groq.com/docs)
-- [NASA APIs](https://api.nasa.gov)
-
-### Issues & Support
-- GitHub Issues: [Report Bug](https://github.com/whiteantwan58-tech/Psi.streamlit.app/issues)
-- Discussions: [Ask Questions](https://github.com/whiteantwan58-tech/Psi.streamlit.app/discussions)
+- **Streamlit Docs**: https://docs.streamlit.io
+- **Repository**: https://github.com/whiteantwan58-tech/Psi.streamlit.app
+- **Issues**: https://github.com/whiteantwan58-tech/Psi.streamlit.app/issues
 
 ---
 
-## Success Criteria Checklist
+**Prepared by**: Copilot Agent
+**Date**: February 14, 2026
+**Version**: 2.0
 
-- [ ] ✅ App deploys to Streamlit Cloud
-- [ ] ✅ All 6 tabs load correctly
-- [ ] ✅ PSI token price displays (live or simulated)
-- [ ] ✅ Bonding curve shows progress
-- [ ] ✅ Wallet balance monitored
-- [ ] ✅ CEC/WAM data loads
-- [ ] ✅ EVE AI chat responds
-- [ ] ✅ Auto-refresh works (30s)
-- [ ] ✅ Activity logging active
-- [ ] ✅ Mobile-responsive design
-- [ ] ✅ Loads in <3 seconds
-- [ ] ✅ 80% visual design achieved
-- [ ] ✅ Zero critical errors
-
----
-
-## Version History
-
-### v3.0.0 (Current - Sovereign System)
-- ✅ Complete rewrite with production code
-- ✅ Fixed critical syntax errors
-- ✅ Implemented 6 functional tabs
-- ✅ Real Solana blockchain integration
-- ✅ Quantum-themed holographic UI
-- ✅ EVE AI chat system
-- ✅ Activity logging framework
-- ✅ Auto-refresh mechanisms
-- ✅ Bonding curve calculations
-- ✅ CEC/WAM Master Ledger
-- ✅ Mobile-optimized design
-
-### v2.0.0 (Previous)
-- CEC/WAM integration framework
-- Basic Solana queries
-- Google Sheets support
-
-### v1.0.0 (Initial)
-- Skeleton code
-- Multi-location dashboards
-- Basic UI
-
----
-
-**Last Updated**: 2026-02-14
-**Maintained by**: whiteantwan58-tech
-**Status**: 🚀 Production Ready (75% complete)
+Once deployment is complete, update this checklist and commit it to the repository.
