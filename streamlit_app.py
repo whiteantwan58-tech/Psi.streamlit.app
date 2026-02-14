@@ -12,11 +12,6 @@ A comprehensive real-time monitoring system for PSI-Coin with:
 
 import streamlit as st
 import time
-
-# Page configuration
-st.set_page_config(
-    page_title="Psi Crypto Dashboard",
-    page_icon="🚀",
 import pandas as pd
 import numpy as np
 import requests
@@ -24,6 +19,13 @@ from datetime import datetime, timedelta
 import os
 import json
 from pathlib import Path
+
+# Import API configuration module
+try:
+    from api_config import get_api_status, get_all_api_info, is_api_key_required
+    API_CONFIG_AVAILABLE = True
+except ImportError:
+    API_CONFIG_AVAILABLE = False
 
 # =============================================================================
 # PAGE CONFIGURATION
@@ -219,21 +221,42 @@ with st.sidebar:
     # API Status Indicator
     st.markdown("---")
     st.markdown("### 🔓 API Configuration")
-    st.success("✅ **No API Keys Required!**")
-    st.caption("Using 100% free APIs")
     
-    with st.expander("📡 Data Sources"):
-        st.markdown("""
-        **Primary**: CoinGecko API
-        - Free tier: 50 calls/min
-        - No authentication needed
+    # Use api_config module if available
+    if API_CONFIG_AVAILABLE:
+        api_status = get_api_status()
+        st.success(f"**{api_status}**")
         
-        **Backup**: CoinCap API  
-        - Free tier: Unlimited
-        - No authentication needed
+        # Show if API key is required
+        if not is_api_key_required():
+            st.caption("Using 100% free APIs")
         
-        💡 *All features work without any configuration!*
-        """)
+        with st.expander("📡 Data Sources"):
+            # Get API info from the module
+            api_info = get_all_api_info()
+            for api in api_info:
+                if api['requires_key'] == 'No':
+                    st.markdown(f"**{api['name']}**: {api['status']}")
+                    st.caption(f"Rate limit: {api['rate_limit']}")
+            
+            st.markdown("💡 *All features work without any configuration!*")
+    else:
+        # Fallback if api_config module is not available
+        st.success("✅ **No API Keys Required!**")
+        st.caption("Using 100% free APIs")
+        
+        with st.expander("📡 Data Sources"):
+            st.markdown("""
+            **Primary**: CoinGecko API
+            - Free tier: 50 calls/min
+            - No authentication needed
+            
+            **Backup**: CoinCap API  
+            - Free tier: Unlimited
+            - No authentication needed
+            
+            💡 *All features work without any configuration!*
+            """)
     
     st.markdown("---")
     st.markdown("### 🎨 About")

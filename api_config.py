@@ -77,7 +77,7 @@ class APIConfig:
             try:
                 if hasattr(st, 'secrets') and secret_key in st.secrets:
                     return st.secrets[secret_key]
-            except Exception:
+            except (FileNotFoundError, KeyError, AttributeError):
                 # Secrets file doesn't exist or key not found - that's fine
                 pass
             
