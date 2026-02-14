@@ -5,6 +5,30 @@ A comprehensive real-time Solana blockchain monitoring and autonomous system for
 
 [![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://psi-streamlit-app.streamlit.app/)
 
+---
+
+## ⚡ QUICKSTART - One-Tap Deployment
+
+**Ready to deploy? It's this easy:**
+
+1. Go to **https://share.streamlit.io**
+2. Sign in with Google
+3. Click **"New app"**
+4. Select: Repository `whiteantwan58-tech/Psi.streamlit.app`, Branch `main`, File `streamlit_app.py`
+5. Click **"Deploy!"**
+
+**That's it!** Your app auto-runs with:
+- ✅ Real-time PSI token monitoring
+- ✅ Auto-refresh every 30 seconds
+- ✅ EVE AI chat (API key pre-configured)
+- ✅ 6 interactive tabs with quantum theme
+- ✅ Self-healing error recovery
+- ✅ Mobile-optimized design
+
+**📖 Full Instructions**: See [QUICKSTART.md](QUICKSTART.md) for detailed step-by-step guide.
+
+---
+
 ## ✨ Features
 
 ### 🎨 Visual Design (80% Visual / 20% Text)
