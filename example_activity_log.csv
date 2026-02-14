@@ -1,0 +1,6 @@
+Timestamp,Action,Details,Status
+2026-02-14 16:40:00,System Startup,PSI Sovereign System initialized,Success
+2026-02-14 16:40:01,Wallet Balance Fetch,Balance: 0.0000 SOL,Success
+2026-02-14 16:40:02,PSI Price Fetch,Using simulated price: $0.003466,Warning
+2026-02-14 16:40:03,CEC/WAM Data Load,Generated example data,Warning
+2026-02-14 16:40:05,Bonding Curve Calc,Progress: 0.00%,Success

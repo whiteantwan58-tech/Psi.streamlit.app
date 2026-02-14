@@ -1,5 +1,20 @@
 .streamlit/secrets.toml
 
+# Environment variables
+.env
+*.env
+
+# CSV data files (may contain sensitive info)
+*.csv
+!example.csv
+!example_cec_wam.csv
+
+# Activity logs and backup files
+activity_log.csv
+!example_activity_log.csv
+*_old.py
+*_backup.py
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -124,13 +139,18 @@ celerybeat.pid
 *.sage.py
 
 # Environments
-.env
 .venv
 env/
 venv/
 ENV/
 env.bak/
 venv.bak/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
 
 # Spyder project settings
 .spyderproject
