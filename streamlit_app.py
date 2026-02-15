@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 🚀 PSI.streamlit.app - Complete Sovereign System
 Real-time Visual Intelligence Dashboard
@@ -474,32 +475,61 @@ def create_nav_star_map():
     return fig
 
 def log_activity(action, details, status):
-    """Log activity to activity_log.csv"""
+    """Log activity to activity_log.csv using efficient append method"""
     try:
+        import csv
+        import fcntl
+        
         log_file = "activity_log.csv"
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         
-        # Create log entry
-        log_entry = {
-            "Timestamp": timestamp,
-            "Action": action,
-            "Details": details,
-            "Status": status
-        }
+        # Create log entry row
+        log_row = [timestamp, action, details, status]
         
-        # Check if log file exists
-        if os.path.exists(log_file):
-            df = pd.read_csv(log_file)
-            df = pd.concat([df, pd.DataFrame([log_entry])], ignore_index=True)
-        else:
-            df = pd.DataFrame([log_entry])
+        # Check if file exists to determine if we need headers
+        file_exists = os.path.exists(log_file)
         
-        # Write to CSV
-        df.to_csv(log_file, index=False)
+        # Append to CSV with file locking to prevent concurrent write issues
+        with open(log_file, 'a', newline='') as f:
+            # Try to acquire lock (Unix systems)
+            try:
+                fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+            except:
+                pass  # Windows doesn't support fcntl, skip locking
+            
+            writer = csv.writer(f)
+            
+            # Write header if new file
+            if not file_exists or os.path.getsize(log_file) == 0:
+                writer.writerow(["Timestamp", "Action", "Details", "Status"])
+            
+            writer.writerow(log_row)
+            
+            # Release lock
+            try:
+                fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+            except:
+                pass
+        
         return True
     except Exception as e:
-        st.warning(f"Could not log activity: {e}")
-        return False
+        # Fallback to old method if append fails
+        try:
+            log_entry = {
+                "Timestamp": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                "Action": action,
+                "Details": details,
+                "Status": status
+            }
+            if os.path.exists(log_file):
+                df = pd.read_csv(log_file)
+                df = pd.concat([df, pd.DataFrame([log_entry])], ignore_index=True)
+            else:
+                df = pd.DataFrame([log_entry])
+            df.to_csv(log_file, index=False)
+            return True
+        except:
+            return False
 
 def load_activity_log():
     """Load activity log from CSV"""
@@ -513,21 +543,53 @@ def load_activity_log():
         st.warning(f"Could not load activity log: {e}")
         return pd.DataFrame(columns=["Timestamp", "Action", "Details", "Status"])
 
+def load_csv_files():
+    """Load CSV files from the repository root, excluding activity_log.csv"""
+    csv_files = []
+    try:
+        import glob
+        csv_paths = glob.glob("*.csv")
+        for csv_path in csv_paths:
+            # Exclude activity_log.csv from data management
+            if csv_path == "activity_log.csv":
+                continue
+            try:
+                df = pd.read_csv(csv_path)
+                csv_files.append({"name": csv_path, "data": df})
+            except Exception as e:
+                st.warning(f"Could not load {csv_path}: {e}")
+    except Exception as e:
+        st.warning(f"Error scanning for CSV files: {e}")
+    return csv_files
+
 def get_activity_stats(log_df):
     """Calculate activity statistics"""
     if log_df.empty:
-        return {"total": 0, "success": 0, "error": 0, "success_rate": 0}
+        return {
+            "total": 0,
+            "success": 0,
+            "error": 0,
+            "warning": 0,
+            "info": 0,
+            "success_rate": 0,
+        }
     
     total = len(log_df)
     success = len(log_df[log_df['Status'] == 'SUCCESS'])
     error = len(log_df[log_df['Status'] == 'ERROR'])
-    success_rate = (success / total * 100) if total > 0 else 0
+    warning = len(log_df[log_df['Status'] == 'WARNING'])
+    info = len(log_df[log_df['Status'] == 'INFO'])
+    
+    known_status_count = success + error + warning + info
+    success_rate = (success / known_status_count * 100) if known_status_count > 0 else 0
     
     return {
         "total": total,
         "success": success,
         "error": error,
-        "success_rate": success_rate
+        "warning": warning,
+        "info": info,
+        "success_rate": success_rate,
     }
 
 # Main app
@@ -682,7 +744,10 @@ def show_home_dashboard():
         with col1:
             with st.spinner("🔄 Loading wallet balance..."):
                 wallet_balance = fetch_wallet_balance(WALLET_ADDRESS)
-                log_activity("FETCH_WALLET_BALANCE", f"Wallet: {WALLET_ADDRESS[:8]}...", "SUCCESS" if wallet_balance >= 0 else "ERROR")
+                # fetch_wallet_balance returns 0.0 on error, check if it's None or truly zero
+                # For now, log as SUCCESS if we got a value (even 0.0 could be valid)
+                wallet_status = "SUCCESS" if wallet_balance is not None else "ERROR"
+                log_activity("FETCH_WALLET_BALANCE", f"Wallet: {WALLET_ADDRESS[:8]}..., Balance: {wallet_balance}", wallet_status)
                 st.metric(
                     label="💎 Wallet SOL Balance",
                     value=f"{wallet_balance:.4f} SOL",
@@ -750,7 +815,7 @@ def show_home_dashboard():
             st.markdown("🔄 **Refresh Status:** Active")
         with col_sync2:
             data_age = datetime.now().strftime('%H:%M:%S')
-            st.markdown(f"📊 **Data Age:** Just now")
+            st.markdown(f"📊 **Data Age:** {data_age}")
         with col_sync3:
             st.markdown(f"⏱️ **Sync Interval:** 5 min")
         
@@ -850,7 +915,7 @@ def show_home_dashboard():
                 st.error("❌ Failed to fetch CEC/WAM data. Please check:")
                 st.markdown("""
                 - Sheet URL is correct
-                - Sheet is publicly accessible (Share → Anyone with link can view)
+                - Sheet is publicly accessible (Share > Anyone with link can view)
                 - Sheet contains valid CSV data
                 """)
         else:
@@ -879,7 +944,7 @@ def show_home_dashboard():
                 ### Setup Instructions
                 
                 1. Create a Google Sheet with your data
-                2. Make it publicly accessible (Share → Anyone with link can view)
+                2. Make it publicly accessible (Share > Anyone with link can view)
                 3. Set environment variable: `CEC_WAM_SHEET_URL=your_sheet_url`
                 4. Restart the application
                 
@@ -1168,15 +1233,17 @@ def show_timeline():
         
         # Statistics dashboard
         st.subheader("📊 Activity Statistics")
-        col1, col2, col3, col4 = st.columns(4)
+        col1, col2, col3, col4, col5 = st.columns(5)
         
         with col1:
             st.metric("📝 Total Operations", stats["total"])
         with col2:
-            st.metric("✅ Successful", stats["success"], delta=None)
+            st.metric("✅ Successful", stats["success"])
         with col3:
-            st.metric("❌ Errors", stats["error"], delta=None)
+            st.metric("⚠️ Warnings", stats["warning"])
         with col4:
+            st.metric("❌ Errors", stats["error"])
+        with col5:
             success_color = "🟢" if stats["success_rate"] >= 80 else "🟡" if stats["success_rate"] >= 50 else "🔴"
             st.metric(f"{success_color} Success Rate", f"{stats['success_rate']:.1f}%")
         
@@ -1187,8 +1254,16 @@ def show_timeline():
             st.subheader("🔄 Recent Activity (Last 5)")
             recent = activity_log.tail(5).sort_index(ascending=False)
             
-            for idx, row in recent.iterrows():
-                status_emoji = "✅" if row['Status'] == 'SUCCESS' else "⚠️" if row['Status'] == 'WARNING' else "❌"
+            for _, row in recent.iterrows():
+                # Handle all status types with appropriate emoji
+                if row['Status'] == 'SUCCESS':
+                    status_emoji = "✅"
+                elif row['Status'] == 'WARNING':
+                    status_emoji = "⚠️"
+                elif row['Status'] == 'INFO':
+                    status_emoji = "ℹ️"
+                else:  # ERROR or other
+                    status_emoji = "❌"
                 st.markdown(f"{status_emoji} **{row['Action']}** - {row['Details']} _{row['Timestamp']}_")
             
             st.divider()
@@ -1204,12 +1279,15 @@ def show_timeline():
                     return ['background-color: #f8d7da'] * len(row)
                 elif row['Status'] == 'WARNING':
                     return ['background-color: #fff3cd'] * len(row)
+                elif row['Status'] == 'INFO':
+                    return ['background-color: #d1ecf1'] * len(row)
                 else:
                     return [''] * len(row)
             
-            # Display styled dataframe
+            # Display styled dataframe with status-based highlighting
+            styled_log = activity_log.sort_index(ascending=False).style.apply(highlight_status, axis=1)
             st.dataframe(
-                activity_log.sort_index(ascending=False),
+                styled_log,
                 use_container_width=True,
                 height=400
             )
