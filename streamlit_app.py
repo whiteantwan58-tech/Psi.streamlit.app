@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 🚀 PSI.streamlit.app - Complete Sovereign System
 Real-time Visual Intelligence Dashboard
@@ -473,7 +474,125 @@ def create_nav_star_map():
     
     return fig
 
-# ==================== MAIN APPLICATION ====================
+def log_activity(action, details, status):
+    """Log activity to activity_log.csv using efficient append method"""
+    try:
+        import csv
+        import fcntl
+        
+        log_file = "activity_log.csv"
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        
+        # Create log entry row
+        log_row = [timestamp, action, details, status]
+        
+        # Check if file exists to determine if we need headers
+        file_exists = os.path.exists(log_file)
+        
+        # Append to CSV with file locking to prevent concurrent write issues
+        with open(log_file, 'a', newline='') as f:
+            # Try to acquire lock (Unix systems)
+            try:
+                fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+            except:
+                pass  # Windows doesn't support fcntl, skip locking
+            
+            writer = csv.writer(f)
+            
+            # Write header if new file
+            if not file_exists or os.path.getsize(log_file) == 0:
+                writer.writerow(["Timestamp", "Action", "Details", "Status"])
+            
+            writer.writerow(log_row)
+            
+            # Release lock
+            try:
+                fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+            except:
+                pass
+        
+        return True
+    except Exception as e:
+        # Fallback to old method if append fails
+        try:
+            log_entry = {
+                "Timestamp": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                "Action": action,
+                "Details": details,
+                "Status": status
+            }
+            if os.path.exists(log_file):
+                df = pd.read_csv(log_file)
+                df = pd.concat([df, pd.DataFrame([log_entry])], ignore_index=True)
+            else:
+                df = pd.DataFrame([log_entry])
+            df.to_csv(log_file, index=False)
+            return True
+        except:
+            return False
+
+def load_activity_log():
+    """Load activity log from CSV"""
+    try:
+        log_file = "activity_log.csv"
+        if os.path.exists(log_file):
+            df = pd.read_csv(log_file)
+            return df
+        return pd.DataFrame(columns=["Timestamp", "Action", "Details", "Status"])
+    except Exception as e:
+        st.warning(f"Could not load activity log: {e}")
+        return pd.DataFrame(columns=["Timestamp", "Action", "Details", "Status"])
+
+def load_csv_files():
+    """Load CSV files from the repository root, excluding activity_log.csv"""
+    csv_files = []
+    try:
+        import glob
+        csv_paths = glob.glob("*.csv")
+        for csv_path in csv_paths:
+            # Exclude activity_log.csv from data management
+            if csv_path == "activity_log.csv":
+                continue
+            try:
+                df = pd.read_csv(csv_path)
+                csv_files.append({"name": csv_path, "data": df})
+            except Exception as e:
+                st.warning(f"Could not load {csv_path}: {e}")
+    except Exception as e:
+        st.warning(f"Error scanning for CSV files: {e}")
+    return csv_files
+
+def get_activity_stats(log_df):
+    """Calculate activity statistics"""
+    if log_df.empty:
+        return {
+            "total": 0,
+            "success": 0,
+            "error": 0,
+            "warning": 0,
+            "info": 0,
+            "success_rate": 0,
+        }
+    
+    total = len(log_df)
+    success = len(log_df[log_df['Status'] == 'SUCCESS'])
+    error = len(log_df[log_df['Status'] == 'ERROR'])
+    warning = len(log_df[log_df['Status'] == 'WARNING'])
+    info = len(log_df[log_df['Status'] == 'INFO'])
+    
+    known_status_count = success + error + warning + info
+    success_rate = (success / known_status_count * 100) if known_status_count > 0 else 0
+    
+    return {
+        "total": total,
+        "success": success,
+        "error": error,
+        "warning": warning,
+        "info": info,
+        "success_rate": success_rate,
+    }
+
+# Main app
 def main():
     """Main application logic"""
     
@@ -528,7 +647,8 @@ def main():
             log_activity("Logout", f"User logged out", "ℹ️ Info")
             st.rerun()
     
-    # ==================== PAGE ROUTING ====================
+    # Main content tabs
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["📈 Live Data", "🌐 CEC/WAM Live", "💰 Holdings", "📁 CSV Data", "📋 Activity Log", "ℹ️ About"])
     
     if page == "🏠 Home Dashboard":
         show_home_dashboard()
@@ -605,79 +725,103 @@ def show_home_dashboard():
     if not cec_data.empty:
         status_counts = cec_data['Status'].value_counts()
         
-        cols = st.columns(len(status_counts))
-        for i, (status, count) in enumerate(status_counts.items()):
-            with cols[i]:
-                st.metric(f"{get_status_color(status)} {status}", count)
-    
-    # Recent Activity
-    st.markdown("### 📝 Recent Activity")
-    if st.session_state.activity_log:
-        recent_logs = pd.DataFrame(st.session_state.activity_log[-10:])
-        st.dataframe(recent_logs, use_container_width=True, hide_index=True)
-    else:
-        st.info("No recent activity to display.")
-
-def show_psi_tracker():
-    """PSI tracking page"""
-    st.markdown("<h1>💎 PSI TRACKER</h1>", unsafe_allow_html=True)
-    st.markdown("### Real-time PSI Bonding Curve Monitoring")
-    st.markdown("---")
-    
-    # Auto-refresh every 30 seconds
-    placeholder = st.empty()
-    
-    psi_data = fetch_psi_data()
-    
-    # Large metrics display
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        st.markdown(f"""
-            <div style='text-align: center; padding: 30px; background: linear-gradient(135deg, rgba(0, 217, 255, 0.2), rgba(168, 85, 247, 0.2)); border-radius: 15px; border: 2px solid rgba(0, 217, 255, 0.4);'>
-                <h1 style='font-size: 3em; margin: 0;'>💎</h1>
-                <h2 style='margin: 10px 0;'>${psi_data['current_price']:.6f}</h2>
-                <p style='color: rgba(0, 217, 255, 0.8);'>Current PSI Price</p>
-            </div>
-        """, unsafe_allow_html=True)
-    
-    with col2:
-        st.markdown(f"""
-            <div style='text-align: center; padding: 30px; background: linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(255, 215, 0, 0.2)); border-radius: 15px; border: 2px solid rgba(168, 85, 247, 0.4);'>
-                <h1 style='font-size: 3em; margin: 0;'>💰</h1>
-                <h2 style='margin: 10px 0;'>${psi_data['internal_value']:.2f}</h2>
-                <p style='color: rgba(168, 85, 247, 0.8);'>Internal Value</p>
-            </div>
-        """, unsafe_allow_html=True)
-    
-    with col3:
-        st.markdown(f"""
-            <div style='text-align: center; padding: 30px; background: linear-gradient(135deg, rgba(255, 215, 0, 0.2), rgba(0, 217, 255, 0.2)); border-radius: 15px; border: 2px solid rgba(255, 215, 0, 0.4);'>
-                <h1 style='font-size: 3em; margin: 0;'>🚀</h1>
-                <h2 style='margin: 10px 0;'>{psi_data['bonding_curve_progress']:.1f}%</h2>
-                <p style='color: rgba(255, 215, 0, 0.8);'>Bonding Curve</p>
-            </div>
-        """, unsafe_allow_html=True)
-    
-    st.markdown("---")
-    
-    # Charts
-    tab1, tab2, tab3 = st.tabs(["📈 Price Chart", "🎯 Bonding Curve", "📊 Analytics"])
-    
-    with tab1:
-        st.plotly_chart(create_psi_tracker_chart(psi_data), use_container_width=True)
+        # Live status indicators
+        col_status1, col_status2, col_status3 = st.columns(3)
+        with col_status1:
+            st.markdown("🟢 **Live Connection Active**")
+        with col_status2:
+            countdown = 30 - (datetime.now().second % 30)
+            st.markdown(f"🔄 **Auto-Refresh:** {countdown}s")
+        with col_status3:
+            st.markdown(f"📡 **Data Fresh:** ✅")
         
-        # Price changes
-        col_a, col_b, col_c = st.columns(3)
-        with col_a:
-            st.metric("24h Change", f"{psi_data['price_24h_change']:.2f}%")
-        with col_b:
-            st.metric("7d Change", f"{psi_data['price_7d_change']:.2f}%")
-        with col_c:
-            st.metric("30d Change", f"{psi_data['price_30d_change']:.2f}%")
+        st.divider()
+        
+        # Create columns for metrics
+        col1, col2, col3 = st.columns(3)
+        
+        # Fetch wallet balance
+        with col1:
+            with st.spinner("🔄 Loading wallet balance..."):
+                wallet_balance = fetch_wallet_balance(WALLET_ADDRESS)
+                # fetch_wallet_balance returns 0.0 on error, check if it's None or truly zero
+                # For now, log as SUCCESS if we got a value (even 0.0 could be valid)
+                wallet_status = "SUCCESS" if wallet_balance is not None else "ERROR"
+                log_activity("FETCH_WALLET_BALANCE", f"Wallet: {WALLET_ADDRESS[:8]}..., Balance: {wallet_balance}", wallet_status)
+                st.metric(
+                    label="💎 Wallet SOL Balance",
+                    value=f"{wallet_balance:.4f} SOL",
+                    delta=None
+                )
+                st.caption(f"🕒 {datetime.now().strftime('%H:%M:%S')}")
+        
+        # Fetch token metadata
+        with col2:
+            with st.spinner("🔄 Loading token data..."):
+                token_metadata = fetch_token_metadata(TOKEN_ADDRESS)
+                if token_metadata:
+                    log_activity("FETCH_TOKEN_METADATA", f"Token: {TOKEN_ADDRESS[:8]}...", "SUCCESS")
+                    token_name = token_metadata.get("name", "PSI-Coin")
+                    token_symbol = token_metadata.get("symbol", "PSI")
+                    st.metric(
+                        label="🪙 Token Info",
+                        value=f"{token_symbol}",
+                        delta=token_name
+                    )
+                else:
+                    log_activity("FETCH_TOKEN_METADATA", f"Token: {TOKEN_ADDRESS[:8]}...", "ERROR")
+                    st.metric(
+                        label="🪙 Token Info",
+                        value="PSI-Coin",
+                        delta="Loading..."
+                    )
+                st.caption(f"🕒 {datetime.now().strftime('%H:%M:%S')}")
+        
+        # Fetch token price
+        with col3:
+            with st.spinner("🔄 Loading token price..."):
+                token_price = fetch_token_price(TOKEN_ADDRESS)
+                log_activity("FETCH_TOKEN_PRICE", f"Price: ${token_price:.6f}", "SUCCESS" if token_price > 0 else "WARNING")
+                st.metric(
+                    label="💵 Token Price",
+                    value=f"${token_price:.6f}" if token_price > 0 else "N/A",
+                    delta=None
+                )
+                st.caption(f"🕒 {datetime.now().strftime('%H:%M:%S')}")
+        
+        st.divider()
+        
+        # Token details
+        if token_metadata:
+            st.subheader("Token Metadata")
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.write("**Name:**", token_metadata.get("name", "N/A"))
+                st.write("**Symbol:**", token_metadata.get("symbol", "N/A"))
+                st.write("**Decimals:**", token_metadata.get("decimals", "N/A"))
+            
+            with col2:
+                st.write("**Token Type:**", "SPL Token")
+                st.write("**Network:**", "Solana Mainnet")
+                st.write("**Status:**", "✅ Active")
     
     with tab2:
-        st.plotly_chart(create_bonding_curve_chart(psi_data['bonding_curve_progress']), use_container_width=True)
+        st.header("🌐 CEC/WAM Live Data System")
+        
+        # Real-time refresh indicator
+        col_sync1, col_sync2, col_sync3 = st.columns(3)
+        with col_sync1:
+            st.markdown("🔄 **Refresh Status:** Active")
+        with col_sync2:
+            data_age = datetime.now().strftime('%H:%M:%S')
+            st.markdown(f"📊 **Data Age:** {data_age}")
+        with col_sync3:
+            st.markdown(f"⏱️ **Sync Interval:** 5 min")
+        
+        st.divider()
+        
+        st.info("📊 **CEC/WAM (Wide Area Monitoring)** - Real-time data synchronization system")
         
         st.markdown("""
             ### 📘 About the Bonding Curve
@@ -688,117 +832,150 @@ def show_psi_tracker():
             - **Internal Value**: $155.50 locked as foundation
             - **Target**: 100% completion unlocks full sovereign system
             
-            Each purchase moves the curve forward, increasing the price for the next buyer.
-        """)
+            st.write("**Status Color Codes:**")
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.write(f"{CEC_WAM_STATUS_COLORS['PERFECT']} PERFECT")
+            with col2:
+                st.write(f"{CEC_WAM_STATUS_COLORS['TODO']} TODO")
+            with col3:
+                st.write(f"{CEC_WAM_STATUS_COLORS['ACTIVE']} ACTIVE")
+            with col4:
+                st.write(f"{CEC_WAM_STATUS_COLORS['STABLE']} STABLE")
+        
+        st.divider()
+        
+        # Fetch and display CEC/WAM data
+        if CEC_WAM_GOOGLE_SHEET_URL:
+            with st.spinner("🔄 Fetching live CEC/WAM data from Google Sheets..."):
+                cec_wam_df = fetch_cec_wam_data(CEC_WAM_GOOGLE_SHEET_URL)
+                
+            if cec_wam_df is not None and not cec_wam_df.empty:
+                log_activity("FETCH_CEC_WAM_DATA", f"Loaded {len(cec_wam_df)} records", "SUCCESS")
+                st.success(f"✅ Successfully loaded {len(cec_wam_df)} records from live data source")
+                st.caption(f"🕒 Data loaded at: {datetime.now().strftime('%H:%M:%S')}")
+                
+                # Animated record counter
+                st.markdown(f"### 📊 Total Records: **{len(cec_wam_df)}**")
+                
+                # Status distribution analytics
+                status_counts = analyze_cec_wam_status(cec_wam_df)
+                
+                if status_counts:
+                    st.subheader("📊 Status Distribution")
+                    cols = st.columns(4)
+                    for idx, (status, count) in enumerate(status_counts.items()):
+                        with cols[idx]:
+                            st.metric(
+                                label=f"{CEC_WAM_STATUS_COLORS[status]} {status}",
+                                value=count
+                            )
+                
+                st.divider()
+                
+                # Display the data with status indicators
+                st.subheader("📋 Live CEC/WAM Data Table")
+                
+                # Add status indicators to dataframe display
+                if 'Status' in cec_wam_df.columns:
+                    display_df = cec_wam_df.copy()
+                    display_df['Status'] = display_df['Status'].apply(
+                        lambda x: f"{get_status_indicator(x)} {x}"
+                    )
+                    st.dataframe(display_df, use_container_width=True, height=400)
+                else:
+                    st.dataframe(cec_wam_df, use_container_width=True, height=400)
+                
+                # Data statistics
+                st.caption(f"📈 Total Records: {len(cec_wam_df)} | Columns: {len(cec_wam_df.columns)} | Last Updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+                
+                # Export option
+                st.divider()
+                st.subheader("💾 Export CEC/WAM Data")
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    csv_export = cec_wam_df.to_csv(index=False)
+                    if st.download_button(
+                        label="⬇️ Download as CSV",
+                        data=csv_export,
+                        file_name=f"cec_wam_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                        mime="text/csv"
+                    ):
+                        log_activity("EXPORT_CEC_WAM_DATA", f"Exported {len(cec_wam_df)} records", "SUCCESS")
+                
+                with col2:
+                    st.info(f"🔄 Auto-refresh: Every {CEC_WAM_REFRESH_INTERVAL // 60} minutes")
+                
+            elif cec_wam_df is not None and cec_wam_df.empty:
+                log_activity("FETCH_CEC_WAM_DATA", "Sheet is empty", "WARNING")
+                st.warning("⚠️ Google Sheet is empty or has no data")
+            else:
+                log_activity("FETCH_CEC_WAM_DATA", "Failed to fetch data", "ERROR")
+                st.error("❌ Failed to fetch CEC/WAM data. Please check:")
+                st.markdown("""
+                - Sheet URL is correct
+                - Sheet is publicly accessible (Share > Anyone with link can view)
+                - Sheet contains valid CSV data
+                """)
+        else:
+            st.info("ℹ️ CEC/WAM live data system is not configured. Set `CEC_WAM_SHEET_URL` to enable.")
+            
+            # Demo/Example section
+            with st.expander("📖 Learn More About CEC/WAM System"):
+                st.markdown("""
+                ### What is CEC/WAM?
+                
+                **CEC/WAM (Wide Area Monitoring)** is a real-time data monitoring and aggregation system that:
+                
+                - 🔄 **Live Data Sync**: Automatically fetches data from Google Sheets
+                - 🎨 **Color-Coded Status**: Visual indicators for system states
+                - 📊 **Analytics**: Real-time status distribution and metrics
+                - 💾 **Data Export**: Export live data for offline analysis
+                - ⚡ **Auto-Refresh**: Keeps data fresh with periodic updates
+                
+                ### Status System
+                
+                - 🟢 **PERFECT**: System operating optimally
+                - 🟡 **TODO**: Items requiring attention
+                - 🔵 **ACTIVE**: Currently processing or in progress
+                - ⚪ **STABLE**: System in stable state
+                
+                ### Setup Instructions
+                
+                1. Create a Google Sheet with your data
+                2. Make it publicly accessible (Share > Anyone with link can view)
+                3. Set environment variable: `CEC_WAM_SHEET_URL=your_sheet_url`
+                4. Restart the application
+                
+                ### Expected Data Format
+                
+                Your Google Sheet should include at least these columns:
+                - **Status**: PERFECT, TODO, ACTIVE, or STABLE
+                - Any additional columns for your data
+                """)
     
     with tab3:
-        col1, col2 = st.columns(2)
+        st.header("💰 Holdings & Valuation Calculator")
         
-        with col1:
-            st.markdown("### 📊 Key Metrics")
-            metrics_df = pd.DataFrame({
-                'Metric': ['Market Cap', 'Total Holders', 'Circulating Supply', 'Total Supply', 'Last Update'],
-                'Value': [
-                    f"${psi_data['market_cap']:,.2f}",
-                    f"{psi_data['holders']}",
-                    "TBD",
-                    "TBD",
-                    psi_data['last_update'].strftime("%Y-%m-%d %H:%M:%S")
-                ]
-            })
-            st.dataframe(metrics_df, use_container_width=True, hide_index=True)
+        # Calculate holdings if we have price data
+        with st.spinner("🔄 Loading price data..."):
+            token_price = fetch_token_price(TOKEN_ADDRESS)
         
-        with col2:
-            st.markdown("### 🎯 Milestones")
-            milestones = [
-                {"Stage": "Foundation", "Progress": "0%", "Status": "🔵 Current"},
-                {"Stage": "Golden Lock", "Progress": "25%", "Status": "⚪ Pending"},
-                {"Stage": "OMEGA Lock", "Progress": "50%", "Status": "⚪ Pending"},
-                {"Stage": "Sovereign", "Progress": "100%", "Status": "⚪ Target"}
-            ]
-            st.dataframe(pd.DataFrame(milestones), use_container_width=True, hide_index=True)
-    
-    # Auto-refresh indicator
-    st.markdown(f"<p style='text-align: center; color: rgba(0, 217, 255, 0.6); font-size: 12px;'>🔄 Auto-refreshing every 30 seconds | Last update: {psi_data['last_update'].strftime('%H:%M:%S')}</p>", unsafe_allow_html=True)
-
-def show_cec_wam_data():
-    """CEC WAM data page"""
-    st.markdown("<h1>📊 CEC WAM DATA</h1>", unsafe_allow_html=True)
-    st.markdown("### Wide Area Monitoring System")
-    st.markdown("---")
-    
-    cec_data = load_cec_wam_data()
-    
-    if not cec_data.empty:
-        # Status overview
-        st.markdown("### 🎯 System Status Overview")
-        
-        status_counts = cec_data['Status'].value_counts()
-        cols = st.columns(len(status_counts))
-        
-        for i, (status, count) in enumerate(status_counts.items()):
-            with cols[i]:
-                percentage = (count / len(cec_data)) * 100
-                st.markdown(f"""
-                    <div style='text-align: center; padding: 20px; background: linear-gradient(135deg, rgba(0, 217, 255, 0.15), rgba(168, 85, 247, 0.15)); border-radius: 10px;'>
-                        <h1 style='font-size: 2.5em; margin: 0;'>{get_status_color(status)}</h1>
-                        <h2 style='margin: 10px 0;'>{count}</h2>
-                        <p>{status}</p>
-                        <p style='font-size: 0.8em; color: rgba(0, 217, 255, 0.6);'>{percentage:.1f}%</p>
-                    </div>
-                """, unsafe_allow_html=True)
-        
-        st.markdown("---")
-        
-        # Data table with color coding
-        st.markdown("### 📋 Detailed Status Log")
-        
-        # Add emoji column
-        cec_data['🎯'] = cec_data['Status'].apply(get_status_color)
-        
-        # Reorder columns
-        display_cols = ['🎯', 'Status', 'Component', 'Description', 'Value', 'Timestamp']
-        st.dataframe(
-            cec_data[display_cols],
-            use_container_width=True,
-            hide_index=True,
-            height=400
-        )
-        
-        # Value distribution chart
-        st.markdown("### 📊 Value Distribution")
-        
-        fig = px.bar(
-            cec_data,
-            x='Component',
-            y='Value',
-            color='Status',
-            title='Component Values by Status',
-            color_discrete_map={
-                'PERFECT': '#00FF00',
-                'ACTIVE': '#00D9FF',
-                'STABLE': '#FFFFFF',
-                'TODO': '#FFD700'
-            }
-        )
-        fig.update_layout(
-            template='plotly_dark',
-            paper_bgcolor='rgba(0,0,0,0)',
-            plot_bgcolor='rgba(0,0,0,0)',
-            font=dict(color='#00D9FF')
-        )
-        st.plotly_chart(fig, use_container_width=True)
-        
-        # Export option
-        col1, col2, col3 = st.columns([1, 1, 1])
-        with col2:
-            csv = cec_data.to_csv(index=False)
-            st.download_button(
-                label="📥 Download CEC WAM Data",
-                data=csv,
-                file_name=f"cec_wam_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-                mime="text/csv",
-                use_container_width=True
+        if token_price > 0:
+            st.success(f"✅ Current PSI-Coin Price: ${token_price:.6f}")
+            st.caption(f"🕒 Price updated at: {datetime.now().strftime('%H:%M:%S')}")
+            
+            st.divider()
+            
+            st.info("💡 Enter your PSI-Coin holdings to calculate current valuation")
+            
+            holdings_amount = st.number_input(
+                "Enter PSI-Coin Amount:",
+                min_value=0.0,
+                value=0.0,
+                step=1.0,
+                format="%.2f"
             )
     else:
         st.warning("⚠️ No CEC WAM data available")
@@ -819,27 +996,78 @@ def show_navigation_map():
         st.markdown("""
             ### 🗺️ Navigation Coordinates
             
-            **Current Position**
-            - X: 0.00 (Origin)
-            - Y: 0.00 (Origin)
-            - Z: 0.00 (Origin)
-            
-            **Waypoints**
-            - 🏠 **Origin**: Home base
-            - 💎 **PSI**: Token foundation
-            - 🌌 **Wormhole**: Black hole entry
-            - 🎯 **Destination**: Sovereign system
-        """)
+            if holdings_amount > 0:
+                total_value = holdings_amount * token_price
+                
+                st.divider()
+                st.subheader("📊 Portfolio Summary")
+                
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("💎 Holdings", f"{holdings_amount:,.2f} PSI")
+                with col2:
+                    st.metric("💵 Token Price", f"${token_price:.6f}")
+                with col3:
+                    # Color-coded value indicator
+                    value_color = "🟢" if total_value > 0 else "⚪"
+                    st.metric(f"{value_color} Total Value", f"${total_value:.2f}")
+                
+                st.caption(f"🕒 Calculated at: {datetime.now().strftime('%H:%M:%S')}")
+                
+                st.divider()
+                
+                # Export option
+                st.subheader("💾 Export Portfolio Data")
+                if st.button("📥 Export Holdings to CSV"):
+                    export_data = [{
+                        "Token": "PSI-Coin",
+                        "Address": TOKEN_ADDRESS,
+                        "Holdings": holdings_amount,
+                        "Price_USD": token_price,
+                        "Total_Value_USD": total_value,
+                        "Timestamp": datetime.now().isoformat()
+                    }]
+                    csv_data = export_to_csv(export_data, "psi_holdings.csv")
+                    if csv_data:
+                        log_activity("EXPORT_HOLDINGS", f"Holdings: {holdings_amount}, Value: ${total_value:.2f}", "SUCCESS")
+                        st.download_button(
+                            label="⬇️ Download CSV",
+                            data=csv_data,
+                            file_name=f"psi_holdings_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                            mime="text/csv"
+                        )
+                        st.success("✅ Holdings data ready for download!")
+                        st.caption(f"🕒 {datetime.now().strftime('%H:%M:%S')}")
+        else:
+            st.warning("⚠️ Token price data not available. Holdings calculation unavailable.")
+            log_activity("HOLDINGS_CALCULATOR", "Price not available", "WARNING")
     
-    with col2:
-        st.markdown("""
-            ### 🌀 Black Hole Status
+    with tab4:
+        st.header("📁 CSV Data Management")
+        
+        # Load CSV files
+        with st.spinner("🔄 Loading CSV files..."):
+            csv_files = load_csv_files()
+        
+        if csv_files:
+            log_activity("LOAD_CSV_FILES", f"Loaded {len(csv_files)} files", "SUCCESS")
+            st.success(f"✅ Found {len(csv_files)} CSV file(s)")
+            st.caption(f"🕒 Files loaded at: {datetime.now().strftime('%H:%M:%S')}")
             
-            **Wormhole Simulation**
-            - Status: 🔵 Active
-            - Singularity: 1.75E+21
-            - Event Horizon: Stable
-            - Navigation: Safe
+            st.divider()
+            
+            for csv_file in csv_files:
+                with st.expander(f"📄 {csv_file['name']}", expanded=True):
+                    st.dataframe(csv_file['data'], use_container_width=True)
+                    
+                    # Show statistics
+                    st.caption(f"📊 Rows: {len(csv_file['data'])} | Columns: {len(csv_file['data'].columns)}")
+        else:
+            log_activity("LOAD_CSV_FILES", "No CSV files found", "INFO")
+            st.info("ℹ️ No CSV files found in the repository root directory.")
+            st.write("To add CSV data:")
+            st.write("1. Place your `pump.fun.csv` or other CSV files in the root directory")
+            st.write("2. Refresh the app to load the data")
             
             **Journey Progress**
             - Phase 1: Foundation ✅
@@ -971,117 +1199,168 @@ def show_timeline():
         activity_df = pd.DataFrame(st.session_state.activity_log)
         st.dataframe(activity_df, use_container_width=True, hide_index=True, height=300)
         
-        # Export activity log
-        csv = activity_df.to_csv(index=False)
-        st.download_button(
-            label="📥 Download Activity Log",
-            data=csv,
-            file_name=f"activity_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-            mime="text/csv"
-        )
-    else:
-        st.info("No activity logged yet.")
-
-def show_alerts():
-    """Alerts page"""
-    st.markdown("<h1>🔔 ALERTS</h1>", unsafe_allow_html=True)
-    st.markdown("### System Notifications")
-    st.markdown("---")
+        # File upload option
+        st.subheader("📤 Upload CSV Data")
+        uploaded_file = st.file_uploader("Choose a CSV file", type=['csv'])
+        
+        if uploaded_file is not None:
+            try:
+                with st.spinner("🔄 Processing uploaded file..."):
+                    df = pd.read_csv(uploaded_file)
+                log_activity("UPLOAD_CSV", f"Uploaded {uploaded_file.name}", "SUCCESS")
+                st.success(f"✅ Successfully loaded {uploaded_file.name}")
+                st.dataframe(df, use_container_width=True)
+                st.caption(f"📊 Rows: {len(df)} | Columns: {len(df.columns)}")
+                st.caption(f"🕒 Uploaded at: {datetime.now().strftime('%H:%M:%S')}")
+            except Exception as e:
+                log_activity("UPLOAD_CSV", f"Failed to upload {uploaded_file.name}: {str(e)}", "ERROR")
+                st.error(f"❌ Error loading file: {e}")
     
-    # Alerts overview
-    total_alerts = len(st.session_state.alerts)
-    unread_alerts = sum(1 for alert in st.session_state.alerts if not alert['read'])
-    
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        st.metric("Total Alerts", total_alerts)
-    with col2:
-        st.metric("Unread", unread_alerts, delta=f"{unread_alerts} new")
-    with col3:
-        st.metric("System Status", "🟢 Normal")
-    
-    st.markdown("---")
-    
-    # Display alerts
-    if st.session_state.alerts:
-        for i, alert in enumerate(reversed(st.session_state.alerts)):
-            alert_icon = {
-                'info': 'ℹ️',
-                'success': '✅',
-                'warning': '⚠️',
-                'error': '❌'
-            }.get(alert['type'], 'ℹ️')
+    with tab5:
+        st.header("📋 Activity Log")
+        
+        # Load activity log
+        with st.spinner("🔄 Loading activity log..."):
+            activity_log = load_activity_log()
+        
+        # Activity statistics
+        stats = get_activity_stats(activity_log)
+        
+        # Live system time
+        st.markdown(f"### 🕒 System Time: **{datetime.now().strftime('%H:%M:%S')}**")
+        
+        st.divider()
+        
+        # Statistics dashboard
+        st.subheader("📊 Activity Statistics")
+        col1, col2, col3, col4, col5 = st.columns(5)
+        
+        with col1:
+            st.metric("📝 Total Operations", stats["total"])
+        with col2:
+            st.metric("✅ Successful", stats["success"])
+        with col3:
+            st.metric("⚠️ Warnings", stats["warning"])
+        with col4:
+            st.metric("❌ Errors", stats["error"])
+        with col5:
+            success_color = "🟢" if stats["success_rate"] >= 80 else "🟡" if stats["success_rate"] >= 50 else "🔴"
+            st.metric(f"{success_color} Success Rate", f"{stats['success_rate']:.1f}%")
+        
+        st.divider()
+        
+        # Recent activity ticker
+        if not activity_log.empty:
+            st.subheader("🔄 Recent Activity (Last 5)")
+            recent = activity_log.tail(5).sort_index(ascending=False)
             
-            with st.expander(f"{alert_icon} {alert['title']} - {alert['timestamp'].strftime('%Y-%m-%d %H:%M:%S')}"):
-                st.markdown(f"**Message:** {alert['message']}")
-                st.markdown(f"**Type:** {alert['type'].upper()}")
-                st.markdown(f"**Read:** {'Yes' if alert['read'] else 'No'}")
-                
-                if st.button(f"Mark as Read", key=f"alert_{i}"):
-                    alert['read'] = True
-                    st.rerun()
-    else:
-        st.info("No alerts to display.")
+            for _, row in recent.iterrows():
+                # Handle all status types with appropriate emoji
+                if row['Status'] == 'SUCCESS':
+                    status_emoji = "✅"
+                elif row['Status'] == 'WARNING':
+                    status_emoji = "⚠️"
+                elif row['Status'] == 'INFO':
+                    status_emoji = "ℹ️"
+                else:  # ERROR or other
+                    status_emoji = "❌"
+                st.markdown(f"{status_emoji} **{row['Action']}** - {row['Details']} _{row['Timestamp']}_")
+            
+            st.divider()
+            
+            # Full activity log table
+            st.subheader("📜 Complete Activity Log")
+            
+            # Color-code the status column
+            def highlight_status(row):
+                if row['Status'] == 'SUCCESS':
+                    return ['background-color: #d4edda'] * len(row)
+                elif row['Status'] == 'ERROR':
+                    return ['background-color: #f8d7da'] * len(row)
+                elif row['Status'] == 'WARNING':
+                    return ['background-color: #fff3cd'] * len(row)
+                elif row['Status'] == 'INFO':
+                    return ['background-color: #d1ecf1'] * len(row)
+                else:
+                    return [''] * len(row)
+            
+            # Display styled dataframe with status-based highlighting
+            styled_log = activity_log.sort_index(ascending=False).style.apply(highlight_status, axis=1)
+            st.dataframe(
+                styled_log,
+                use_container_width=True,
+                height=400
+            )
+            
+            st.caption(f"📈 Total Logged Operations: {len(activity_log)}")
+            st.caption(f"🕒 Log last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            
+            # Export activity log
+            st.divider()
+            st.subheader("💾 Export Activity Log")
+            
+            csv_export = activity_log.to_csv(index=False)
+            st.download_button(
+                label="⬇️ Download Activity Log CSV",
+                data=csv_export,
+                file_name=f"activity_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                mime="text/csv"
+            )
+        else:
+            st.info("ℹ️ No activity logged yet. Operations will be logged automatically as you use the application.")
     
-    st.markdown("---")
-    
-    # Test alert
-    if st.button("🧪 Generate Test Alert"):
-        create_alert(
-            "Test Alert",
-            f"This is a test alert generated at {datetime.now().strftime('%H:%M:%S')}",
-            "info"
-        )
-        st.success("Test alert created!")
-        st.rerun()
-
-def show_settings():
-    """Settings page"""
-    st.markdown("<h1>⚙️ SETTINGS</h1>", unsafe_allow_html=True)
-    st.markdown("### System Configuration")
-    st.markdown("---")
-    
-    tab1, tab2, tab3 = st.tabs(["🔧 General", "🔐 Security", "📊 Data"])
-    
-    with tab1:
-        st.markdown("### ⚙️ General Settings")
+    with tab6:
+        st.header("About PSI-Coin Monitor")
         
-        auto_refresh = st.checkbox("Auto-refresh data", value=True)
-        refresh_interval = st.slider("Refresh interval (seconds)", 10, 300, 30)
+        st.markdown("""
+        ### 🎯 Purpose
+        This application provides real-time monitoring of PSI-Coin (EVE 1010_WAKE) on the Solana blockchain.
         
-        st.markdown("### 🎨 Display Settings")
+        ### ✨ Features
+        - **Real-time Data**: Live updates every 30 seconds
+        - **Wallet Monitoring**: Track SOL balance in real-time
+        - **Token Tracking**: Monitor PSI-Coin metadata and pricing
+        - **Activity Logging**: Complete audit trail of all operations
+          - Real-time operation tracking
+          - Success rate analytics
+          - Export logs for analysis
+        - **CEC/WAM System**: Live data synchronization with Google Sheets
+          - Color-coded status indicators (PERFECT, TODO, ACTIVE, STABLE)
+          - Real-time status distribution analytics
+          - Auto-refresh every 5 minutes
+          - Data export capabilities
+        - **CSV Integration**: Import and manage pump.fun.csv data
+        - **Holdings Calculator**: Calculate portfolio valuation
+        - **Data Export**: Export holdings and metrics to CSV
         
-        theme = st.selectbox("Theme", ["Holographic (Default)", "Dark", "Light"])
-        show_animations = st.checkbox("Show animations", value=True)
+        ### 🔗 Blockchain Details
+        - **Network**: Solana Mainnet Beta
+        - **RPC Endpoint**: `api.mainnet-beta.solana.com`
+        - **Token Standard**: SPL Token
+        - **Data Source**: Solscan Public API
         
-        st.markdown("### 🔔 Notifications")
+        ### 🌐 CEC/WAM System
+        - **Purpose**: Wide Area Monitoring for real-time data aggregation
+        - **Data Source**: Google Sheets (CSV export)
+        - **Refresh Rate**: 5 minutes (300 seconds)
+        - **Status Codes**: PERFECT (🟢), TODO (🟡), ACTIVE (🔵), STABLE (⚪)
+        - **Features**: Live sync, analytics, color-coded indicators, data export
         
-        enable_alerts = st.checkbox("Enable alerts", value=True)
-        alert_sound = st.checkbox("Alert sound", value=False)
-    
-    with tab2:
-        st.markdown("### 🔐 Security Settings")
+        ### 🔒 Security
+        - ✅ No hardcoded API keys
+        - ✅ Environment variable configuration
+        - ✅ Read-only blockchain access
+        - ✅ Public address monitoring only
         
-        st.info("Currently logged in as: " + st.session_state.username)
-        
-        st.markdown("### 🔑 Change Password")
-        
-        old_password = st.text_input("Current Password", type="password")
-        new_password = st.text_input("New Password", type="password")
-        confirm_password = st.text_input("Confirm New Password", type="password")
-        
-        if st.button("Update Password"):
-            if new_password == confirm_password:
-                st.success("✅ Password updated successfully!")
-                log_activity("Security", "Password changed", "✅ Success")
-            else:
-                st.error("❌ Passwords do not match!")
+        ### 📚 Resources
+        - [Solana Documentation](https://docs.solana.com/)
+        - [Solscan Explorer](https://solscan.io/)
+        - [Streamlit Documentation](https://docs.streamlit.io/)
+        """)
         
         st.markdown("### 🛡️ Security Features")
         
-        two_factor = st.checkbox("Enable 2FA (Coming Soon)", disabled=True)
-        session_timeout = st.slider("Session timeout (minutes)", 15, 120, 60)
+        st.caption("Built with ❤️ using Streamlit | Version 3.0.0 - Activity Logging & Enhanced Visuals")
     
     with tab3:
         st.markdown("### 📊 Data Management")

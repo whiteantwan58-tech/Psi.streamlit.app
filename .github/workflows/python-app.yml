@@ -36,6 +36,10 @@ jobs:
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics --exclude=.git,__pycache__,.venv,*_old.py,*_backup.py
     - name: Test app imports
       run: |
-        # Allow pytest to pass when no tests exist (temporary until tests are added)
-        # TODO: Add comprehensive test suite and remove || true
-        pytest || true
+        pytest
+        status=$?
+        if [ "$status" -eq 5 ]; then
+          echo "pytest exited with code 5 (no tests collected); treating as success."
+          exit 0
+        fi
+        exit "$status"
